@@ -6,6 +6,9 @@ from typing import List, Optional
 import database
 import models
 import datetime
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 app = FastAPI(
     title="Sistema de Accesos y Trazabilidad Kullki Wasi",
@@ -120,6 +123,9 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Usuario no encontrado")
     if emp.estado_laboral != "ACTIVO":
         raise HTTPException(status_code=400, detail="Usuario inactivo")
+    
+    if emp.password_hash and not pwd_context.verify(req.password, emp.password_hash):
+        raise HTTPException(status_code=400, detail="Contraseña incorrecta")
     
     rol_nombre = emp.rol.nombre if emp.rol else "Usuario DB"
     agencia_nombre = emp.agencia_base.nombre if emp.agencia_base else "MAT"
