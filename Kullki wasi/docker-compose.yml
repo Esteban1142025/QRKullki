@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - kullki-wasi-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - DATABASE_URL=postgresql://kullki_user:kullki_pass@db:5432/kullki_wasi_db
+      - SECRET_KEY=kullki_wasi_security_token_secret_2026
+    depends_on:
+      - db
+    networks:
+      - kullki-wasi-net
+
+  db:
+    image: postgres:15-alpine
+    container_name: kullki-wasi-db
+    environment:
+      - POSTGRES_USER=kullki_user
+      - POSTGRES_PASSWORD=kullki_pass
+      - POSTGRES_DB=kullki_wasi_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - kullki-wasi-net
+
+volumes:
+  postgres_data:
+
+networks:
+  kullki-wasi-net:
+    driver: bridge
