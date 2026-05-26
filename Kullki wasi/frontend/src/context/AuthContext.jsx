@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { EMPLOYEES, ROLES } from '../data/mockData';
 
 const AuthContext = createContext(null);
@@ -6,6 +7,13 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  const logout = () => {
+    localStorage.removeItem('kw_user');
+    localStorage.removeItem('kw_token');
+    setUser(null);
+  };
 
   useEffect(() => {
     // Restaurar sesión activa
@@ -21,16 +29,39 @@ export const AuthProvider = ({ children }) => {
       }
     }
     setLoading(false);
-  }, []);
+
+    const handleExpired = () => {
+      logout();
+      navigate('/login?expired=true', { replace: true });
+    };
+
+    const handleForbidden = () => {
+      navigate('/unauthorized', { replace: true });
+    };
+
+    window.addEventListener('auth:expired', handleExpired);
+    window.addEventListener('auth:forbidden', handleForbidden);
+
+    return () => {
+      window.removeEventListener('auth:expired', handleExpired);
+      window.removeEventListener('auth:forbidden', handleForbidden);
+    };
+  }, [navigate]);
 
   const login = async (dniOrEmail, password) => {
     setLoading(true);
     // Simular un pequeño retardo de red (300ms)
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    // Buscar en la lista de empleados
-    const employee = EMPLOYEES.find(
-      emp => (emp.dni === dniOrEmail || emp.email.toLowerCase() === dniOrEmail.toLowerCase())
+    // Buscar en la lista de empleados dinámica (para aceptar nuevos usuarios)
+    let currentEmployees = EMPLOYEES;
+    try {
+      const raw = localStorage.getItem('kw_dynamic_employees');
+      if (raw) currentEmployees = JSON.parse(raw);
+    } catch (_) {}
+
+    const employee = currentEmployees.find(
+      emp => (emp.dni === dniOrEmail || (emp.email && emp.email.toLowerCase() === dniOrEmail.toLowerCase()))
     );
 
     if (!employee) {
@@ -99,15 +130,15 @@ export const AuthProvider = ({ children }) => {
   };
 
   const loginAsRole = async (roleId) => {
-    // Buscar un empleado con este rol
-    const employee = EMPLOYEES.find(emp => emp.role === roleId && emp.status === "Activo") || EMPLOYEES[0];
+    // Buscar en la lista dinámica
+    let currentEmployees = EMPLOYEES;
+    try {
+      const raw = localStorage.getItem('kw_dynamic_employees');
+      if (raw) currentEmployees = JSON.parse(raw);
+    } catch (_) {}
+    
+    const employee = currentEmployees.find(emp => emp.role === roleId && emp.status === "Activo") || currentEmployees[0];
     return login(employee.dni, "kullki123");
-  };
-
-  const logout = () => {
-    localStorage.removeItem('kw_user');
-    localStorage.removeItem('kw_token');
-    setUser(null);
   };
 
   const hasPermission = (permission) => {

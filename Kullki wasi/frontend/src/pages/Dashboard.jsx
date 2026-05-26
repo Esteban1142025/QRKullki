@@ -253,7 +253,7 @@ const Dashboard = () => {
           <div className="space-y-2 overflow-y-auto max-h-72 flex-1 pr-1">
             {logs.slice(0, 7).map((log) => {
               const ok = log.status === 'Autorizado';
-              const initials = log.name.split(' ').map(n => n[0]).slice(0, 2).join('');
+              const initials = (log.name || 'U').split(' ').filter(Boolean).map(n => n[0]).slice(0, 2).join('').toUpperCase();
               return (
                 <div
                   key={log.id}

@@ -107,13 +107,26 @@ const Employees = () => {
       return;
     }
 
+    // Verificar duplicados (excluyendo al empleado actual si se está editando)
+    const duplicate = employees.find(emp => 
+      emp.id !== form.id && (emp.dni === form.dni || emp.email.toLowerCase() === form.email.toLowerCase())
+    );
+    if (duplicate) {
+      fireSwal({ icon: 'error', title: 'Datos Duplicados', text: 'Ya existe otro colaborador con esta Cédula o Correo.' });
+      return;
+    }
+
+    // Generar o actualizar QR Code
+    const idSufix = form.id.includes('-') ? form.id.split('-')[1] : form.id;
+    const qrCode = `KULLKIWASI-${form.role.toUpperCase()}-${form.dni}-${idSufix}`;
+    const formWithQR = { ...form, qrCode };
+
     let updated;
     if (editing) {
-      updated = employees.map(e => e.id === form.id ? { ...form } : e);
+      updated = employees.map(e => e.id === form.id ? formWithQR : e);
       auditLog(`Edición de expediente de ${form.name} (${form.id}).`);
     } else {
-      const qrCode = `KULLKIWASI-${form.role.toUpperCase()}-${form.dni}-${form.id.split('-')[1]}`;
-      updated = [{ ...form, qrCode }, ...employees];
+      updated = [formWithQR, ...employees];
       auditLog(`Alta de nuevo colaborador ${form.name} (${form.id}).`, 'Medio');
     }
 

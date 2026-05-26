@@ -42,15 +42,15 @@ apiClient.interceptors.response.use(
         localStorage.removeItem(ENVIRONMENT.jwtStorageKey);
         localStorage.removeItem(ENVIRONMENT.userStorageKey);
         
-        // Redirigir al login si no estamos ya allí
+        // Emitir evento para redirección limpia vía SPA
         if (window.location.pathname !== '/login') {
-          window.location.href = '/login?expired=true';
+          window.dispatchEvent(new CustomEvent('auth:expired'));
         }
       }
       
       // Control de falta de privilegios
       if (status === 403) {
-        window.location.href = '/unauthorized';
+        window.dispatchEvent(new CustomEvent('auth:forbidden'));
       }
     }
     
