@@ -77,3 +77,7 @@ class BitacoraAcceso(Base):
     fecha_hora = Column(DateTime, default=datetime.datetime.utcnow)
     resultado = Column(String(20), nullable=False)
     motivo = Column(Text, nullable=True)
+
+    empleado = relationship("Empleado")
+    area = relationship("AreaRestringida")
+    dispositivo = relationship("DispositivoEscaneo")

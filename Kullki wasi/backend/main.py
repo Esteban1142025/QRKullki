@@ -124,13 +124,14 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     if emp.estado_laboral != "ACTIVO":
         raise HTTPException(status_code=400, detail="Usuario inactivo")
     
-    if emp.password_hash and not pwd_context.verify(req.password, emp.password_hash):
+    if not emp.password_hash or not pwd_context.verify(req.password, emp.password_hash):
         raise HTTPException(status_code=400, detail="Contraseña incorrecta")
     
     rol_nombre = emp.rol.nombre if emp.rol else "Usuario DB"
     agencia_nombre = emp.agencia_base.nombre if emp.agencia_base else "MAT"
-    role_id_str = str(emp.id_rol) if emp.id_rol else "empleado"
-    agencia_id_str = str(emp.id_agencia_base) if emp.id_agencia_base else "MAT"
+    # El frontend espera que el rol sea un string representativo como "admin", "talento_humano"
+    role_id_str = emp.rol.nombre.lower().replace(" ", "_") if emp.rol else "empleado"
+    agencia_id_str = "MAT" if not emp.agencia_base else str(emp.id_agencia_base)
 
     # Return user info matching what frontend expects, using real db values
     return {
@@ -171,21 +172,27 @@ def listar_empleados(db: Session = Depends(get_db)):
 
 @app.post("/api/v1/empleados")
 def crear_empleado(emp: dict, db: Session = Depends(get_db)):
-    # Adaptar lo que manda el frontend al formato DB
-    # emp from frontend: { dni, name, role, department, agency, email, phone, status, qrCode }
-    nombres_split = emp.get("name", "").split(" ")
+    dni_val = str(emp.get("dni", "")).strip()
+    if not dni_val:
+        raise HTTPException(status_code=400, detail="El DNI es obligatorio")
+        
+    # Prevenir IntegrityError (duplicados)
+    if db.query(models.Empleado).filter(models.Empleado.identificacion == dni_val).first():
+        raise HTTPException(status_code=400, detail="El empleado con este DNI ya existe en el Backend")
+
+    nombre_completo = str(emp.get("name") or "")
+    nombres_split = nombre_completo.split(" ") if nombre_completo else ["Desconocido"]
     nombres = nombres_split[0]
     apellidos = " ".join(nombres_split[1:]) if len(nombres_split) > 1 else ""
     
     rol_val = emp.get("role")
     agencia_val = emp.get("agency")
     
-    # Tratamos de castear a int si es un ID, sino dejamos NULL (o buscamos por nombre)
     id_rol_val = int(rol_val) if rol_val and str(rol_val).isdigit() else 1
     id_agencia_val = int(agencia_val) if agencia_val and str(agencia_val).isdigit() else 1
     
     nuevo_emp = models.Empleado(
-        identificacion=emp.get("dni", "000"),
+        identificacion=dni_val,
         nombres=nombres,
         apellidos=apellidos,
         id_rol=id_rol_val,
@@ -206,8 +213,11 @@ def crear_empleado(emp: dict, db: Session = Depends(get_db)):
 
 @app.delete("/api/v1/empleados/{id}")
 def eliminar_empleado(id: str, db: Session = Depends(get_db)):
-    # el ID viene como KW-123
-    real_id = int(id.replace("KW-", "")) if "KW-" in id else int(id)
+    try:
+        real_id = int(id.replace("KW-", "")) if "KW-" in id else int(id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de ID inválido")
+        
     emp = db.query(models.Empleado).filter(models.Empleado.id_empleado == real_id).first()
     if emp:
         db.delete(emp)
@@ -247,9 +257,9 @@ def listar_logs(db: Session = Depends(get_db)):
     return [{
         "id": l.id_bitacora,
         "timestamp": l.fecha_hora.isoformat(),
-        "name": f"Empleado {l.id_empleado}",
-        "area": f"Area {l.id_area}",
-        "device": f"Dispositivo {l.id_dispositivo}",
+        "name": f"{l.empleado.nombres} {l.empleado.apellidos}" if l.empleado else f"Empleado {l.id_empleado}",
+        "area": l.area.nombre if l.area else f"Área {l.id_area}",
+        "device": l.dispositivo.identificador_equipo if l.dispositivo else f"Dispositivo {l.id_dispositivo}",
         "status": l.resultado,
         "details": l.motivo
     } for l in logs]
