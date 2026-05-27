@@ -1,7 +1,7 @@
 // Environment Configuration
 // Configuración de variables de entorno para desarrollo e integración futura
 
-const API_PORT = 3001;
+const API_PORT = 8000;
 const WS_PORT = 3001;
 
 const getHostName = () => {

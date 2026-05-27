@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { EMPLOYEES, ROLES } from '../data/mockData';
+import apiClient from '../services/api/apiClient';
 
 const AuthContext = createContext(null);
 
@@ -50,95 +50,51 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (dniOrEmail, password) => {
     setLoading(true);
-    // Simular un pequeño retardo de red (300ms)
-    await new Promise(resolve => setTimeout(resolve, 300));
-
-    // Buscar en la lista de empleados dinámica (para aceptar nuevos usuarios)
-    let currentEmployees = EMPLOYEES;
     try {
-      const raw = localStorage.getItem('kw_dynamic_employees');
-      if (raw) currentEmployees = JSON.parse(raw);
-    } catch (_) {}
+      const response = await apiClient.post('/auth/login', {
+        dniOrEmail,
+        password
+      });
+      
+      const { token, user: sessionUser } = response.data;
+      
+      localStorage.setItem('kw_user', JSON.stringify(sessionUser));
+      localStorage.setItem('kw_token', token);
+      setUser(sessionUser);
 
-    const employee = currentEmployees.find(
-      emp => (emp.dni === dniOrEmail || (emp.email && emp.email.toLowerCase() === dniOrEmail.toLowerCase()))
-    );
+      // Registrar bitácora de login localmente (opcional o usar el backend luego)
+      const loginLog = {
+        id: `LOG-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        employeeId: sessionUser.id,
+        name: sessionUser.name,
+        role: sessionUser.role,
+        agency: sessionUser.agency,
+        area: "Plataforma Web",
+        device: "Navegador Web",
+        status: "Autorizado",
+        details: `Inicio de sesión web exitoso.`,
+        risk: "Bajo"
+      };
+      const currentLogs = JSON.parse(localStorage.getItem('kw_dynamic_logs') || '[]');
+      localStorage.setItem('kw_dynamic_logs', JSON.stringify([loginLog, ...currentLogs]));
 
-    if (!employee) {
+      return sessionUser;
+    } catch (error) {
+      const msg = error.response?.data?.detail || "Error al conectar con el servidor";
+      throw new Error(msg);
+    } finally {
       setLoading(false);
-      throw new Error("Usuario o número de cédula no registrado en la Cooperativa.");
     }
-
-    if (employee.status !== "Activo") {
-      setLoading(false);
-      throw new Error("Su cuenta institucional está inactiva. Contacte a Talento Humano.");
-    }
-
-    // Simular validación de clave simple (cualquier contraseña o una específica)
-    // Para facilidades de demo, aceptaremos "kullki123", el DNI, o cualquier clave de más de 4 caracteres
-    if (password.length < 4) {
-      setLoading(false);
-      throw new Error("Contraseña incorrecta (min. 4 caracteres para pruebas).");
-    }
-
-    // Obtener detalles del rol correspondiente
-    const roleDetails = ROLES[employee.role] || { id: "empleado", name: "Empleado", permissions: ["read_own_profile"] };
-    
-    const sessionUser = {
-      ...employee,
-      roleName: roleDetails.name,
-      badgeColor: roleDetails.badgeColor,
-      permissions: roleDetails.permissions
-    };
-
-    // Crear token JWT simulado
-    const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-    const payload = btoa(JSON.stringify({ 
-      sub: employee.id, 
-      name: employee.name, 
-      role: employee.role, 
-      exp: Math.floor(Date.now() / 1000) + (60 * 60 * 2) // 2 horas
-    }));
-    const signature = "simulated_signature_kullkiwasi";
-    const token = `${header}.${payload}.${signature}`;
-
-    localStorage.setItem('kw_user', JSON.stringify(sessionUser));
-    localStorage.setItem('kw_token', token);
-    setUser(sessionUser);
-    setLoading(false);
-
-    // Registrar bitácora de login simulado
-    const loginLog = {
-      id: `LOG-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      employeeId: employee.id,
-      name: employee.name,
-      role: employee.role,
-      agency: employee.agency,
-      area: "Plataforma Web",
-      device: "Navegador Web (Web App)",
-      status: "Autorizado",
-      details: `Inicio de sesión exitoso en la web como ${roleDetails.name}.`,
-      risk: "Bajo"
-    };
-
-    // Guardar logs dinámicos en localStorage para persistencia en la simulación
-    const currentLogs = JSON.parse(localStorage.getItem('kw_dynamic_logs') || '[]');
-    localStorage.setItem('kw_dynamic_logs', JSON.stringify([loginLog, ...currentLogs]));
-
-    return sessionUser;
   };
 
   const loginAsRole = async (roleId) => {
-    // Buscar en la lista dinámica
-    let currentEmployees = EMPLOYEES;
-    try {
-      const raw = localStorage.getItem('kw_dynamic_employees');
-      if (raw) currentEmployees = JSON.parse(raw);
-    } catch (_) {}
+    // Como ahora usamos BD, solo funcionará si sabemos las credenciales o hacemos un endpoint especial.
+    // Para no romper el UI, mapeamos a nuestros dos usuarios creados:
+    let dni = "1111111111"; // empleado
+    if (roleId === "admin" || roleId === "talento_humano") dni = "0000000000"; // admin
     
-    const employee = currentEmployees.find(emp => emp.role === roleId && emp.status === "Activo") || currentEmployees[0];
-    return login(employee.dni, "kullki123");
+    return login(dni, "kullki123");
   };
 
   const hasPermission = (permission) => {

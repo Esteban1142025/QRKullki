@@ -6,9 +6,13 @@ from typing import List, Optional
 import database
 import models
 import datetime
-from passlib.context import CryptContext
+import bcrypt
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    if not hashed_password:
+        return False
+    # bcrypt expects bytes
+    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
 app = FastAPI(
     title="Sistema de Accesos y Trazabilidad Kullki Wasi",
@@ -124,7 +128,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     if emp.estado_laboral != "ACTIVO":
         raise HTTPException(status_code=400, detail="Usuario inactivo")
     
-    if not emp.password_hash or not pwd_context.verify(req.password, emp.password_hash):
+    if not emp.password_hash or not verify_password(req.password, emp.password_hash):
         raise HTTPException(status_code=400, detail="Contraseña incorrecta")
     
     rol_nombre = emp.rol.nombre if emp.rol else "Usuario DB"

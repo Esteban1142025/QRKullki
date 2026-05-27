@@ -28,7 +28,7 @@ const Login = () => {
       fireSwalDark({ icon: 'success', title: 'Sesión Iniciada', text: 'Bienvenido al Sistema de Accesos Kullki Wasi.', timer: 1400, showConfirmButton: false });
       navigate('/dashboard');
     } catch (err) {
-      fireSwalDark({ icon: 'error', title: 'Error de Autenticación', text: err.message, confirmButtonColor: '#ef4444' });
+      fireSwalDark({ icon: 'error', title: 'Error de Autenticación', text: err?.message || 'Error desconocido', confirmButtonColor: '#ef4444' });
     } finally {
       setLoading(false);
     }
@@ -40,7 +40,7 @@ const Login = () => {
       await loginAsRole(roleId);
       navigate('/dashboard');
     } catch (err) {
-      fireSwalDark({ icon: 'error', title: 'Error', text: err.message, confirmButtonColor: '#ef4444' });
+      fireSwalDark({ icon: 'error', title: 'Error', text: err?.message || 'Error desconocido', confirmButtonColor: '#ef4444' });
     } finally {
       setLoadingRole(null);
     }
