@@ -97,10 +97,10 @@ const DashboardLayout = () => {
   return (
     <div 
       className="flex min-h-screen text-slate-800 overflow-hidden relative bg-cover bg-center bg-no-repeat"
-      style={{ backgroundImage: "url('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSY09gcFPVorIMU2Xw2Z_-mlRRJwWGroY_Pxg&s')" }}
+      style={{ backgroundImage: "url('https://imagenes.portafolio.co/files/image_600_455/uploads/2019/09/27/5d8eab1476b13.jpeg')" }}
     >
       {/* Overlay oscuro/translúcido para la imagen de fondo */}
-      <div className="absolute inset-0 bg-slate-100/90 backdrop-blur-[2px]" />
+      <div className="absolute inset-0 bg-slate-100/85 backdrop-blur-[6px]" />
 
       {/* ── SIDEBAR ─────────────────────────────────── */}
       <motion.aside
@@ -119,8 +119,8 @@ const DashboardLayout = () => {
             >
               <img src="https://play-lh.googleusercontent.com/G-uc06_SBqaE8a-M7JKQCD-Hpfkvxb1g9X3VPmyngldtTRS-pr69QPW_4zDBe9_6qEw" alt="Logo" className="w-8 h-8 rounded-lg shadow-md object-cover shrink-0 border border-slate-200" />
               <div className="min-w-0">
-                <span className="text-[11px] font-black tracking-widest text-[#79ac34] uppercase block leading-none">KULLKI WASI</span>
-                <span className="text-[9px] text-slate-500 font-bold tracking-wider uppercase">Control de Accesos</span>
+                <span className="text-[14px] font-black tracking-widest text-[#84cc16] uppercase block leading-none">KULLKI WASI</span>
+                <span className="text-[11px] text-slate-500 font-bold tracking-wider uppercase">Control de Accesos</span>
               </div>
             </motion.div>
           )}
@@ -138,13 +138,13 @@ const DashboardLayout = () => {
         {/* User Avatar */}
         <div className="p-3.5 border-b border-slate-300/60 shrink-0">
           <div className="flex items-center gap-3">
-            <div className={`rounded-full flex items-center justify-center font-bold text-slate-900 bg-gradient-to-br from-[#8DC63F] to-[#facc15] border border-white transition-all shrink-0 shadow-sm ${isCollapsed ? 'w-8 h-8 text-sm' : 'w-10 h-10 text-lg'}`}>
+            <div className={`rounded-full flex items-center justify-center font-bold text-slate-900 bg-gradient-to-br from-[#84cc16] to-[#facc15] border border-white transition-all shrink-0 shadow-sm ${isCollapsed ? 'w-10 h-10 text-sm' : 'w-12 h-12 text-xl'}`}>
               {user?.name?.charAt(0) || 'U'}
             </div>
             {!isCollapsed && (
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold text-slate-700 truncate leading-snug">{user?.name}</p>
-                <span className="inline-block mt-0.5 text-[9px] px-1.5 py-0.5 rounded-md border border-[#8DC63F]/40 bg-[#8DC63F]/15 text-[#6aa832] font-bold uppercase tracking-wider">
+                <p className="text-sm font-bold text-slate-700 truncate leading-snug">{user?.name}</p>
+                <span className="inline-block mt-0.5 text-[11px] px-1.5 py-0.5 rounded-md border border-[#84cc16]/40 bg-[#84cc16]/15 text-[#65a30d] font-bold uppercase tracking-wider">
                   {user?.roleName}
                 </span>
               </div>
@@ -161,16 +161,16 @@ const DashboardLayout = () => {
                 key={path}
                 to={path}
                 title={isCollapsed ? label : undefined}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all group relative ${
+                className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold transition-all group relative ${
                   active
-                    ? 'bg-white text-[#79ac34] shadow-[0_2px_10px_rgba(141,198,63,0.15)] border border-slate-200/60'
+                    ? 'bg-white text-[#84cc16] shadow-[0_2px_10px_rgba(132,204,22,0.15)] border border-slate-200/60'
                     : 'text-slate-500 hover:bg-slate-200/50 hover:text-slate-800'
                 }`}
               >
                 {active && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-gradient-to-b from-[#8DC63F] to-[#facc15] rounded-r-full" />
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-gradient-to-b from-[#84cc16] to-[#facc15] rounded-r-full" />
                 )}
-                <Icon size={18} className={`shrink-0 ${active ? 'text-[#8DC63F]' : 'text-slate-400 group-hover:text-slate-600'}`} />
+                <Icon size={20} className={`shrink-0 ${active ? 'text-[#84cc16]' : 'text-slate-400 group-hover:text-slate-600'}`} />
                 {!isCollapsed && <span className="truncate">{label}</span>}
               </Link>
             );
@@ -178,13 +178,13 @@ const DashboardLayout = () => {
         </nav>
 
         {/* Logout */}
-        <div className="p-2.5 border-t border-slate-300/60 shrink-0 bg-slate-50/50">
+        <div className="p-3 border-t border-slate-300/60 shrink-0 bg-slate-50/50">
           <button
             onClick={handleLogout}
             title={isCollapsed ? 'Cerrar Sesión' : undefined}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-red-500 hover:bg-red-50 hover:text-red-700 transition-all"
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold text-red-500 hover:bg-red-50 hover:text-red-700 transition-all"
           >
-            <MdPowerSettingsNew size={18} className="shrink-0" />
+            <MdPowerSettingsNew size={20} className="shrink-0" />
             {!isCollapsed && <span>Cerrar Sesión</span>}
           </button>
         </div>
@@ -205,8 +205,8 @@ const DashboardLayout = () => {
               <MdMenu size={20} />
             </button>
             <div className="hidden sm:block">
-              <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest leading-none">Kullki Wasi Portal</p>
-              <p className="text-sm font-black text-slate-800 font-['Outfit'] leading-snug">{breadcrumb}</p>
+              <p className="text-[11px] text-slate-500 font-bold uppercase tracking-widest leading-none mb-1">Kullki Wasi Portal</p>
+              <p className="text-lg font-black text-slate-800 font-['Outfit'] leading-snug">{breadcrumb}</p>
             </div>
           </div>
 
@@ -214,21 +214,21 @@ const DashboardLayout = () => {
           <div className="flex items-center gap-3">
 
             {/* Reloj digital */}
-            <div className="hidden xl:flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
-              <MdWatchLater className="text-[#8DC63F]" size={14} />
-              <span className="text-[11px] font-mono font-bold text-slate-700">
+            <div className="hidden xl:flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm">
+              <MdWatchLater className="text-[#84cc16]" size={16} />
+              <span className="text-[13px] font-mono font-bold text-slate-700">
                 {currentTime.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
               </span>
               <span className="text-slate-300">│</span>
-              <span className="text-[10px] text-slate-500 font-semibold">
+              <span className="text-[12px] text-slate-500 font-semibold">
                 {currentTime.toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' })}
               </span>
             </div>
 
             {/* Agencia activa */}
-            <div className="hidden lg:block text-right leading-tight">
-              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Agencia</p>
-              <p className="text-[11px] font-black text-[#79ac34]">{agencyLabel}</p>
+            <div className="hidden lg:block text-right leading-tight mr-2">
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Agencia</p>
+              <p className="text-[13px] font-black text-[#84cc16]">{agencyLabel}</p>
             </div>
 
             {/* Notificaciones */}

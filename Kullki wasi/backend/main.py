@@ -7,17 +7,32 @@ import database
 import models
 import datetime
 import bcrypt
+import jwt
+import pyotp
+
+SECRET_KEY = "kullki-wasi-super-secret-jwt-key"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 15
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     if not hashed_password:
         return False
-    # bcrypt expects bytes
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
+def create_access_token(data: dict, expires_delta: Optional[datetime.timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.datetime.utcnow() + datetime.timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
 app = FastAPI(
-    title="Sistema de Accesos y Trazabilidad Kullki Wasi",
-    description="Servicios REST API y conexión MySQL para control SEPS",
-    version="1.1.0"
+    title="Sistema de Accesos y Trazabilidad Kullki Wasi (Arquitectura Empresarial)",
+    description="Servicios REST API y conexión MySQL para control SEPS con JWT y TOTP",
+    version="2.0.0"
 )
 
 app.add_middleware(
@@ -32,7 +47,7 @@ app.add_middleware(
 def startup_event():
     try:
         models.Base.metadata.create_all(bind=database.engine)
-        print("Tablas de Base de Datos MySQL inicializadas con éxito.")
+        print("Tablas de Base de Datos MySQL inicializadas con éxito (3NF).")
     except Exception as e:
         print(f"Advertencia: No se pudo conectar a la Base de Datos. Detalle: {e}")
 
@@ -48,57 +63,23 @@ def get_db():
 class LoginRequest(BaseModel):
     dniOrEmail: str
     password: str
+    totpCode: Optional[str] = None  # Código QR Dinámico (6 dígitos)
 
 class EmpleadoBase(BaseModel):
     identificacion: str
     nombres: str
     apellidos: str
-    id_rol: Optional[int] = None
+    email: Optional[str] = None
     id_agencia_base: Optional[int] = None
     estado_laboral: str = "ACTIVO"
-
-class EmpleadoCreate(EmpleadoBase):
-    pass
+    role_ids: List[int] = []
 
 class EmpleadoResponse(EmpleadoBase):
     id_empleado: int
-    token_qr: Optional[str] = None
-    
-    model_config = ConfigDict(from_attributes=True)
-
-class AgenciaResponse(BaseModel):
-    id_agencia: int
-    nombre: str
-    direccion: Optional[str] = None
-    estado: bool
-    model_config = ConfigDict(from_attributes=True)
-
-class RolResponse(BaseModel):
-    id_rol: int
-    nombre: str
-    descripcion: Optional[str] = None
-    model_config = ConfigDict(from_attributes=True)
-
-class AreaResponse(BaseModel):
-    id_area: int
-    id_agencia: Optional[int] = None
-    nombre: str
-    nivel_riesgo: str
-    estado: bool
-    model_config = ConfigDict(from_attributes=True)
-
-class DispositivoResponse(BaseModel):
-    id_dispositivo: int
-    id_area: Optional[int] = None
-    identificador_equipo: str
-    estado: bool
     model_config = ConfigDict(from_attributes=True)
 
 class LogResponse(BaseModel):
     id_bitacora: int
-    id_empleado: Optional[int] = None
-    id_area: Optional[int] = None
-    id_dispositivo: Optional[int] = None
     fecha_hora: datetime.datetime
     resultado: str
     motivo: Optional[str] = None
@@ -108,49 +89,58 @@ class LogResponse(BaseModel):
 # --- Rutas Auth ---
 @app.post("/api/v1/auth/login")
 def login(req: LoginRequest, db: Session = Depends(get_db)):
-    emp = db.query(models.Empleado).filter(models.Empleado.identificacion == req.dniOrEmail).first()
+    emp = db.query(models.Empleado).filter(
+        (models.Empleado.identificacion == req.dniOrEmail) | 
+        (models.Empleado.email == req.dniOrEmail)
+    ).first()
+    
     if not emp:
-        # Fallback para poder entrar si la DB está vacía o si el usuario usa admin
+        # Fallback para poder entrar si la DB está vacía o si el usuario usa admin sin DB
         if req.dniOrEmail == "admin":
             return {
-                "token": "fake-jwt-token-db",
+                "token": create_access_token({"sub": "admin", "roles": ["admin"]}),
                 "user": {
                     "id": "KW-000",
-                    "name": "Administrador DB",
+                    "name": "Administrador Fallback",
                     "role": "admin",
-                    "agency": "MAT",
-                    "permissions": ["all"],
-                    "roleName": "Administrador General",
-                    "badgeColor": "bg-red-500/20 text-red-400 border-red-500/30"
+                    "permissions": ["acceso_total"]
                 }
             }
-        raise HTTPException(status_code=400, detail="Usuario no encontrado")
+        raise HTTPException(status_code=400, detail="Credenciales incorrectas")
+        
     if emp.estado_laboral != "ACTIVO":
         raise HTTPException(status_code=400, detail="Usuario inactivo")
     
     if not emp.password_hash or not verify_password(req.password, emp.password_hash):
-        raise HTTPException(status_code=400, detail="Contraseña incorrecta")
+        raise HTTPException(status_code=400, detail="Credenciales incorrectas")
+        
+    # Se elimina la verificación TOTP a petición del usuario
     
-    rol_nombre = emp.rol.nombre if emp.rol else "Usuario DB"
-    agencia_nombre = emp.agencia_base.nombre if emp.agencia_base else "MAT"
-    # El frontend espera que el rol sea un string representativo como "admin", "talento_humano"
-    role_id_str = emp.rol.nombre.lower().replace(" ", "_") if emp.rol else "empleado"
-    agencia_id_str = "MAT" if not emp.agencia_base else str(emp.id_agencia_base)
+    # Extraer roles y permisos
+    roles = [r.nombre for r in emp.roles]
+    permisos = []
+    for r in emp.roles:
+        for p in r.permisos:
+            permisos.append(p.codigo_permiso)
+            
+    access_token_expires = datetime.timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": emp.identificacion, "roles": roles, "permisos": list(set(permisos))},
+        expires_delta=access_token_expires
+    )
 
-    # Return user info matching what frontend expects, using real db values
+    rol_principal = roles[0] if roles else "empleado"
+
     return {
-        "token": "fake-jwt-token-db",
+        "token": access_token,
         "user": {
             "id": f"KW-{emp.id_empleado}",
             "dni": emp.identificacion,
             "name": f"{emp.nombres} {emp.apellidos}",
-            "role": role_id_str,
-            "agency": agencia_id_str,
-            "permissions": ["all"],
-            "roleName": rol_nombre,
-            "badgeColor": "bg-blue-500/20 text-blue-400 border-blue-500/30",
-            "email": f"{emp.nombres.lower().replace(' ', '')}@kullkiwasi.com.ec",
-            "department": "Operaciones",
+            "email": emp.email,
+            "role": rol_principal,
+            "permissions": list(set(permisos)),
+            "roleName": rol_principal.capitalize(),
             "status": emp.estado_laboral
         }
     }
@@ -159,116 +149,100 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
 @app.get("/api/v1/empleados")
 def listar_empleados(db: Session = Depends(get_db)):
     empleados = db.query(models.Empleado).all()
-    # Mapear para el frontend con valores reales
     return [{
         "id": f"KW-{e.id_empleado}",
         "dni": e.identificacion,
         "name": f"{e.nombres} {e.apellidos}",
-        "role": e.rol.nombre if e.rol else (str(e.id_rol) if e.id_rol else "empleado"),
-        "department": "Caja y Servicios",
-        "agency": e.agencia_base.nombre if e.agencia_base else (str(e.id_agencia_base) if e.id_agencia_base else "MAT"),
-        "email": f"{e.identificacion}@kullkiwasi.com.ec",
-        "phone": "0999999999",
+        "role": e.roles[0].nombre if e.roles else "Sin Rol",
+        "email": e.email,
         "status": e.estado_laboral,
-        "qrCode": e.token_qr,
-        "photo": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150"
     } for e in empleados]
 
-@app.post("/api/v1/empleados")
-def crear_empleado(emp: dict, db: Session = Depends(get_db)):
-    dni_val = str(emp.get("dni", "")).strip()
-    if not dni_val:
-        raise HTTPException(status_code=400, detail="El DNI es obligatorio")
+# --- Rutas Areas y Dispositivos (Simulación IoT/Escaneo) ---
+@app.post("/api/v1/scan")
+def registrar_escaneo(data: dict, db: Session = Depends(get_db)):
+    # Simula un escaneo desde un dispositivo IoT
+    totp_escaneado = data.get("totpCode")
+    id_dispositivo = data.get("id_dispositivo", 1)
+    
+    disp = db.query(models.DispositivoEscaneo).filter(models.DispositivoEscaneo.id_dispositivo == id_dispositivo).first()
+    if not disp or not disp.id_area:
+        raise HTTPException(status_code=400, detail="Dispositivo inválido o sin área asignada")
         
-    # Prevenir IntegrityError (duplicados)
-    if db.query(models.Empleado).filter(models.Empleado.identificacion == dni_val).first():
-        raise HTTPException(status_code=400, detail="El empleado con este DNI ya existe en el Backend")
-
-    nombre_completo = str(emp.get("name") or "")
-    nombres_split = nombre_completo.split(" ") if nombre_completo else ["Desconocido"]
-    nombres = nombres_split[0]
-    apellidos = " ".join(nombres_split[1:]) if len(nombres_split) > 1 else ""
+    area = disp.area
     
-    rol_val = emp.get("role")
-    agencia_val = emp.get("agency")
+    # Buscar empleado por TOTP (esto es costoso en la vida real, lo ideal es enviar DNI + TOTP, 
+    # pero para la contingencia asumo que buscan iterando los secrets o mandando un identificador)
+    # Por simplicidad, simularemos DNI + TOTP
+    dni = data.get("dni")
+    emp = db.query(models.Empleado).filter(models.Empleado.identificacion == dni).first()
     
-    id_rol_val = int(rol_val) if rol_val and str(rol_val).isdigit() else 1
-    id_agencia_val = int(agencia_val) if agencia_val and str(agencia_val).isdigit() else 1
+    resultado = "DENEGADO"
+    motivo = "Empleado no encontrado o sin TOTP"
     
-    nuevo_emp = models.Empleado(
-        identificacion=dni_val,
-        nombres=nombres,
-        apellidos=apellidos,
-        id_rol=id_rol_val,
-        id_agencia_base=id_agencia_val,
-        estado_laboral=emp.get("status", "ACTIVO"),
-        token_qr=emp.get("qrCode", "")
+    if emp and emp.totp_secret:
+        totp = pyotp.TOTP(emp.totp_secret)
+        if totp.verify(totp_escaneado):
+            # Validar permisos
+            tiene_permiso = False
+            for r in emp.roles:
+                for p in r.permisos:
+                    if p.id_permiso == area.id_permiso_requerido or p.codigo_permiso == "acceso_total":
+                        tiene_permiso = True
+                        break
+            
+            if tiene_permiso:
+                resultado = "CONCEDIDO"
+                motivo = "Acceso autorizado"
+            else:
+                motivo = f"Falta permiso requerido para el área {area.nombre}"
+        else:
+            motivo = "Código TOTP inválido o clonado"
+            
+    # Registrar en bitácora
+    bitacora = models.BitacoraAcceso(
+        id_empleado=emp.id_empleado if emp else None,
+        id_area=area.id_area,
+        id_dispositivo=disp.id_dispositivo,
+        resultado=resultado,
+        motivo=motivo
     )
-    db.add(nuevo_emp)
+    db.add(bitacora)
     db.commit()
-    db.refresh(nuevo_emp)
+    db.refresh(bitacora)
     
-    return {
-        "id": f"KW-{nuevo_emp.id_empleado}",
-        "dni": nuevo_emp.identificacion,
-        "name": f"{nuevo_emp.nombres} {nuevo_emp.apellidos}",
-        "status": nuevo_emp.estado_laboral
-    }
-
-@app.delete("/api/v1/empleados/{id}")
-def eliminar_empleado(id: str, db: Session = Depends(get_db)):
-    try:
-        real_id = int(id.replace("KW-", "")) if "KW-" in id else int(id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Formato de ID inválido")
-        
-    emp = db.query(models.Empleado).filter(models.Empleado.id_empleado == real_id).first()
-    if emp:
-        db.delete(emp)
+    # Generar alerta ITIL si fue denegado
+    if resultado == "DENEGADO":
+        alerta = models.AlertaSeguridad(
+            id_bitacora_asociada=bitacora.id_bitacora,
+            tipo_alerta="Intento de Acceso Denegado (Posible Intrusión)"
+        )
+        db.add(alerta)
         db.commit()
-    return {"status": "ok"}
 
-# --- Rutas Agencias ---
-@app.get("/api/v1/agencias")
-def listar_agencias(db: Session = Depends(get_db)):
-    # Mapear para frontend (requiere id, name)
-    agencias = db.query(models.Agencia).all()
-    return [{"id": a.id_agencia, "name": a.nombre, "address": a.direccion, "status": "Activo" if a.estado else "Inactivo"} for a in agencias]
+    return {"status": resultado, "motivo": motivo}
 
-# --- Rutas Roles ---
-@app.get("/api/v1/rbac/roles")
-def listar_roles(db: Session = Depends(get_db)):
-    roles = db.query(models.Rol).all()
-    return [{"id": r.id_rol, "name": r.nombre, "description": r.descripcion} for r in roles]
+# --- Alertas ITIL ---
+@app.get("/api/v1/security/alerts")
+def listar_alertas(db: Session = Depends(get_db)):
+    alertas = db.query(models.AlertaSeguridad).order_by(models.AlertaSeguridad.fecha_generacion.desc()).all()
+    return [{
+        "id": a.id_alerta,
+        "type": a.tipo_alerta,
+        "status": a.estado,
+        "date": a.fecha_generacion.isoformat(),
+        "details": a.bitacora.motivo if a.bitacora else "Sin detalles"
+    } for a in alertas]
 
-# --- Rutas Areas ---
-@app.get("/api/v1/areas")
-def listar_areas(db: Session = Depends(get_db)):
-    areas = db.query(models.AreaRestringida).all()
-    return [{"id": a.id_area, "name": a.nombre, "riskLevel": a.nivel_riesgo, "status": "Protegido" if a.estado else "Libre"} for a in areas]
-
-# --- Rutas Dispositivos ---
-@app.get("/api/v1/devices")
-def listar_dispositivos(db: Session = Depends(get_db)):
-    dispositivos = db.query(models.DispositivoEscaneo).all()
-    return [{"id": d.id_dispositivo, "name": d.identificador_equipo, "status": "Online" if d.estado else "Offline"} for d in dispositivos]
-
-# --- Rutas Bitácora ---
 @app.get("/api/v1/audit-logs")
 def listar_logs(db: Session = Depends(get_db)):
     logs = db.query(models.BitacoraAcceso).order_by(models.BitacoraAcceso.fecha_hora.desc()).limit(100).all()
-    # Mapear para frontend
     return [{
         "id": l.id_bitacora,
         "timestamp": l.fecha_hora.isoformat(),
-        "name": f"{l.empleado.nombres} {l.empleado.apellidos}" if l.empleado else f"Empleado {l.id_empleado}",
+        "name": f"{l.empleado.nombres} {l.empleado.apellidos}" if l.empleado else f"Desconocido",
         "area": l.area.nombre if l.area else f"Área {l.id_area}",
-        "device": l.dispositivo.identificador_equipo if l.dispositivo else f"Dispositivo {l.id_dispositivo}",
+        "device": l.dispositivo.identificador_equipo if l.dispositivo else f"Disp. {l.id_dispositivo}",
         "status": l.resultado,
         "details": l.motivo
     } for l in logs]
-
-# --- Security Alerts (Mock for now to satisfy frontend) ---
-@app.get("/api/v1/security/alerts")
-def listar_alertas(db: Session = Depends(get_db)):
-    return []

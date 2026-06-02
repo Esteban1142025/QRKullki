@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 # Se asume servidor local en el puerto 3306, usuario root sin contraseña, base kullkidb
 DATABASE_URL = os.getenv(
     "DATABASE_URL", 
-    "mysql+pymysql://AdminEsteban:DoDBoilingLMS13@localhost:3306/kullkidb"
+    "mysql+pymysql://root:@localhost:3306/kullkidb"
 )
 
 engine = create_engine(DATABASE_URL)

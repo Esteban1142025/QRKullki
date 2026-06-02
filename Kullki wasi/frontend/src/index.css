@@ -5,8 +5,8 @@
   --color-navy-card: #0d1424;
   --color-navy-brand: #0d2347;
   --color-navy-brand-light: #163668;
-  --color-green-brand: #8DC63F;
-  --color-green-brand-hover: #79ac34;
+  --color-green-brand: #84cc16; /* Verde lima más vivo y amarillento */
+  --color-green-brand-hover: #65a30d;
   --font-sans: 'Inter', sans-serif;
   --font-display: 'Outfit', sans-serif;
 }
@@ -17,15 +17,16 @@
   }
 
   body {
-    background-color: #f1f5f9; /* Cambiar a fondo gris muy claro */
-    color: #1e293b;
+    background-color: #f8fafc; /* Blanco oscuro muy sutil */
+    color: #334155; /* Texto principal un poco más oscuro para mejor legibilidad */
     font-family: 'Inter', sans-serif;
+    font-weight: 500; /* Letra un poco más gruesa (medium) por defecto */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   ::selection {
-    background-color: rgba(141, 198, 63, 0.3);
+    background-color: rgba(132, 204, 22, 0.3);
     color: #0f172a;
   }
 }
@@ -33,30 +34,31 @@
 /* =============================================
    CUSTOM SCROLLBAR
 ============================================= */
-::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #8DC63F; }
+::-webkit-scrollbar-thumb:hover { background: #84cc16; }
 
 /* =============================================
    GLASSMORPHISM UTILITIES
 ============================================= */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
 }
 
 .glass-panel-hover {
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-panel-hover:hover {
   background: rgba(255, 255, 255, 1);
-  border-color: rgba(141, 198, 63, 0.3);
-  box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(141, 198, 63, 0.2);
-  transform: translateY(-1px);
+  border-color: rgba(132, 204, 22, 0.5);
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(132, 204, 22, 0.3);
+  transform: translateY(-2px);
 }
 
 /* =============================================
@@ -73,15 +75,15 @@
    GLOW EFFECTS
 ============================================= */
 .glow-green {
-  box-shadow: 0 0 24px rgba(141, 198, 63, 0.18), 0 0 6px rgba(141, 198, 63, 0.08);
+  box-shadow: 0 0 24px rgba(132, 204, 22, 0.25), 0 0 8px rgba(132, 204, 22, 0.15);
 }
 
 .glow-red {
-  box-shadow: 0 0 24px rgba(239, 68, 68, 0.2), 0 0 6px rgba(239, 68, 68, 0.08);
+  box-shadow: 0 0 24px rgba(239, 68, 68, 0.25), 0 0 8px rgba(239, 68, 68, 0.15);
 }
 
 .glow-blue {
-  box-shadow: 0 0 24px rgba(22, 54, 104, 0.4);
+  box-shadow: 0 0 24px rgba(59, 130, 246, 0.25);
 }
 
 /* =============================================
@@ -93,12 +95,12 @@
 }
 
 @keyframes neon-pulse {
-  0%, 100% { opacity: 0.3; transform: scale(1); }
-  50%       { opacity: 0.7; transform: scale(1.04); }
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50%       { opacity: 0.8; transform: scale(1.03); }
 }
 
 @keyframes fade-in-up {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
@@ -113,14 +115,14 @@
 
 /* Skeleton Loading shimmer */
 .skeleton {
-  background: linear-gradient(90deg, #0d1424 25%, #163668 50%, #0d1424 75%);
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
   background-size: 200% 100%;
   animation: shimmer 1.6s infinite;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 /* =============================================
-   FORM ELEMENTS (Global dark style)
+   FORM ELEMENTS
 ============================================= */
 input[type="text"],
 input[type="email"],
@@ -131,9 +133,10 @@ textarea {
   background-color: #ffffff;
   border: 1px solid #cbd5e1;
   color: #1e293b;
-  border-radius: 10px;
-  padding: 8px 12px;
-  font-size: 12px;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 500;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
@@ -141,38 +144,43 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: #8DC63F;
-  box-shadow: 0 0 0 3px rgba(141, 198, 63, 0.15);
+  border-color: #84cc16;
+  box-shadow: 0 0 0 3px rgba(132, 204, 22, 0.2);
 }
 
 input::placeholder,
 textarea::placeholder {
   color: #94a3b8;
+  font-weight: 400;
 }
 
 /* =============================================
-   SWAL2 DARK THEME OVERRIDE
+   SWAL2 THEME OVERRIDE
 ============================================= */
 .swal2-popup {
   font-family: 'Inter', sans-serif !important;
-  border-radius: 16px !important;
-  border: 1px solid rgba(255,255,255,0.06) !important;
+  border-radius: 20px !important;
+  border: 1px solid rgba(0,0,0,0.05) !important;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.1) !important;
 }
 
 .swal2-title {
   font-family: 'Outfit', sans-serif !important;
   font-weight: 800 !important;
+  color: #1e293b !important;
 }
 
 .swal2-confirm {
-  border-radius: 10px !important;
+  border-radius: 12px !important;
   font-weight: 700 !important;
-  letter-spacing: 0.04em !important;
+  letter-spacing: 0.03em !important;
+  padding: 12px 24px !important;
 }
 
 .swal2-cancel {
-  border-radius: 10px !important;
+  border-radius: 12px !important;
   font-weight: 600 !important;
+  padding: 12px 24px !important;
 }
 
 /* =============================================
@@ -180,8 +188,8 @@ textarea::placeholder {
 ============================================= */
 .qr-scanner-frame {
   position: relative;
-  border: 2px solid rgba(141, 198, 63, 0.4);
-  border-radius: 12px;
+  border: 3px solid rgba(132, 204, 22, 0.6);
+  border-radius: 16px;
   overflow: hidden;
 }
 
@@ -191,8 +199,8 @@ textarea::placeholder {
   top: -2px;
   left: 10%;
   right: 10%;
-  height: 2px;
-  background: linear-gradient(to right, transparent, #8DC63F, transparent);
+  height: 3px;
+  background: linear-gradient(to right, transparent, #84cc16, transparent);
   animation: scan-line 2s ease-in-out infinite;
 }
 
@@ -215,31 +223,33 @@ textarea::placeholder {
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 3px;
+  width: 4px;
   height: 60%;
-  background: #8DC63F;
-  border-radius: 0 3px 3px 0;
+  background: #84cc16;
+  border-radius: 0 4px 4px 0;
 }
 
 /* =============================================
    TABLE STYLES
 ============================================= */
 .data-table thead tr th {
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #64748b;
-  padding: 12px 16px;
+  letter-spacing: 0.05em;
+  color: #475569;
+  padding: 16px 20px;
   background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 2px solid #e2e8f0;
 }
 
 .data-table tbody tr td {
-  padding: 12px 16px;
-  font-size: 12px;
+  padding: 16px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #334155;
   border-bottom: 1px solid #f1f5f9;
-  transition: background 0.15s;
+  transition: background 0.2s;
 }
 
 .data-table tbody tr:hover td {

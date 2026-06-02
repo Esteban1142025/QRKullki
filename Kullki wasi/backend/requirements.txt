@@ -7,3 +7,6 @@ python-jose[cryptography]
 passlib[bcrypt]
 python-multipart
 websockets
+PyJWT
+pyotp
+bcrypt
