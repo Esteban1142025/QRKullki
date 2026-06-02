@@ -95,16 +95,21 @@ const DashboardLayout = () => {
     : `Sucursal ${user?.agency ?? ''}`;
 
   return (
-    <div className="flex min-h-screen bg-[#070b13] bg-grid text-slate-200 overflow-hidden">
+    <div 
+      className="flex min-h-screen text-slate-800 overflow-hidden relative bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: "url('https://www.sabermassermas.com/wp-content/uploads/2016/07/Cooperativas_interna.png')" }}
+    >
+      {/* Overlay oscuro/translúcido para la imagen de fondo */}
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[2px]" />
 
       {/* ── SIDEBAR ─────────────────────────────────── */}
       <motion.aside
         animate={{ width: isCollapsed ? 72 : 260 }}
         transition={{ duration: 0.25, ease: 'easeInOut' }}
-        className="hidden md:flex flex-col fixed top-0 bottom-0 left-0 bg-[#0d1424] border-r border-slate-800/70 z-20 overflow-hidden shrink-0"
+        className="hidden md:flex flex-col fixed top-0 bottom-0 left-0 bg-slate-100/95 backdrop-blur-md border-r border-slate-300/50 z-20 overflow-hidden shrink-0 shadow-2xl"
       >
         {/* Logo / Brand */}
-        <div className="flex h-16 items-center justify-between px-4 border-b border-slate-800/60 bg-[#080c17] shrink-0">
+        <div className="flex h-16 items-center justify-between px-4 border-b border-slate-300/60 bg-white/50 shrink-0">
           {!isCollapsed && (
             <motion.div
               initial={{ opacity: 0 }}
@@ -112,38 +117,38 @@ const DashboardLayout = () => {
               exit={{ opacity: 0 }}
               className="flex items-center gap-2.5 overflow-hidden"
             >
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#8DC63F] to-[#6aa832] flex items-center justify-center font-black text-[#0d2347] text-sm shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#8DC63F] to-[#facc15] flex items-center justify-center font-black text-slate-900 text-sm shrink-0 shadow-md">
                 KW
               </div>
               <div className="min-w-0">
-                <span className="text-[11px] font-black tracking-widest text-[#8DC63F] uppercase block leading-none">KULLKI WASI</span>
-                <span className="text-[9px] text-slate-500 font-semibold tracking-wider uppercase">Control de Accesos</span>
+                <span className="text-[11px] font-black tracking-widest text-[#79ac34] uppercase block leading-none">KULLKI WASI</span>
+                <span className="text-[9px] text-slate-500 font-bold tracking-wider uppercase">Control de Accesos</span>
               </div>
             </motion.div>
           )}
           {isCollapsed && (
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#8DC63F] to-[#6aa832] flex items-center justify-center font-black text-[#0d2347] text-sm mx-auto">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#8DC63F] to-[#facc15] flex items-center justify-center font-black text-slate-900 text-sm mx-auto shadow-md">
               KW
             </div>
           )}
           <button
             onClick={() => setIsCollapsed(v => !v)}
-            className="p-1.5 rounded-lg bg-slate-800/40 hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-colors ml-2 shrink-0"
+            className="p-1.5 rounded-lg bg-slate-200/50 hover:bg-slate-300/80 text-slate-500 hover:text-slate-800 transition-colors ml-2 shrink-0"
           >
             <MdChevronLeft className={`transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`} size={16} />
           </button>
         </div>
 
         {/* User Avatar */}
-        <div className="p-3.5 border-b border-slate-800/50 shrink-0">
+        <div className="p-3.5 border-b border-slate-300/60 shrink-0">
           <div className="flex items-center gap-3">
-            <div className={`rounded-full flex items-center justify-center font-bold text-[#0d2347] bg-gradient-to-br from-[#8DC63F] to-[#6aa832] border-2 border-[#8DC63F]/40 transition-all shrink-0 ${isCollapsed ? 'w-8 h-8 text-sm' : 'w-10 h-10 text-lg'}`}>
+            <div className={`rounded-full flex items-center justify-center font-bold text-slate-900 bg-gradient-to-br from-[#8DC63F] to-[#facc15] border border-white transition-all shrink-0 shadow-sm ${isCollapsed ? 'w-8 h-8 text-sm' : 'w-10 h-10 text-lg'}`}>
               {user?.name?.charAt(0) || 'U'}
             </div>
             {!isCollapsed && (
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold text-slate-200 truncate leading-snug">{user?.name}</p>
-                <span className="inline-block mt-0.5 text-[9px] px-1.5 py-0.5 rounded border border-[#8DC63F]/30 bg-[#8DC63F]/10 text-[#8DC63F] font-bold uppercase tracking-wider">
+                <p className="text-xs font-bold text-slate-700 truncate leading-snug">{user?.name}</p>
+                <span className="inline-block mt-0.5 text-[9px] px-1.5 py-0.5 rounded-md border border-[#8DC63F]/40 bg-[#8DC63F]/15 text-[#6aa832] font-bold uppercase tracking-wider">
                   {user?.roleName}
                 </span>
               </div>
@@ -160,16 +165,16 @@ const DashboardLayout = () => {
                 key={path}
                 to={path}
                 title={isCollapsed ? label : undefined}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all group relative ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all group relative ${
                   active
-                    ? 'bg-gradient-to-r from-[#0d2347] to-[#0f2a54] text-[#8DC63F] shadow-inner'
-                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-100'
+                    ? 'bg-white text-[#79ac34] shadow-[0_2px_10px_rgba(141,198,63,0.15)] border border-slate-200/60'
+                    : 'text-slate-500 hover:bg-slate-200/50 hover:text-slate-800'
                 }`}
               >
                 {active && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-[#8DC63F] rounded-r-full" />
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-gradient-to-b from-[#8DC63F] to-[#facc15] rounded-r-full" />
                 )}
-                <Icon size={18} className={`shrink-0 ${active ? 'text-[#8DC63F]' : 'text-slate-500 group-hover:text-slate-300'}`} />
+                <Icon size={18} className={`shrink-0 ${active ? 'text-[#8DC63F]' : 'text-slate-400 group-hover:text-slate-600'}`} />
                 {!isCollapsed && <span className="truncate">{label}</span>}
               </Link>
             );
@@ -177,11 +182,11 @@ const DashboardLayout = () => {
         </nav>
 
         {/* Logout */}
-        <div className="p-2.5 border-t border-slate-800/60 shrink-0">
+        <div className="p-2.5 border-t border-slate-300/60 shrink-0 bg-slate-50/50">
           <button
             onClick={handleLogout}
             title={isCollapsed ? 'Cerrar Sesión' : undefined}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-red-400/80 hover:bg-red-500/10 hover:text-red-300 transition-all"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-red-500 hover:bg-red-50 hover:text-red-700 transition-all"
           >
             <MdPowerSettingsNew size={18} className="shrink-0" />
             {!isCollapsed && <span>Cerrar Sesión</span>}
@@ -190,22 +195,22 @@ const DashboardLayout = () => {
       </motion.aside>
 
       {/* ── MAIN CONTENT ─────────────────────────────── */}
-      <div className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ${isCollapsed ? 'md:ml-[72px]' : 'md:ml-[260px]'}`}>
+      <div className={`flex-1 flex flex-col min-h-screen transition-all duration-300 z-10 ${isCollapsed ? 'md:ml-[72px]' : 'md:ml-[260px]'}`}>
 
         {/* TOPBAR */}
-        <header className="h-16 border-b border-slate-800/60 bg-[#0d1424]/90 backdrop-blur-md sticky top-0 z-10 px-4 md:px-6 flex items-center justify-between gap-4 shrink-0">
+        <header className="h-16 border-b border-slate-300/20 bg-slate-100/90 backdrop-blur-md sticky top-0 z-10 px-4 md:px-6 flex items-center justify-between gap-4 shrink-0 shadow-sm">
 
           {/* Left: mobile menu + breadcrumb */}
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileOpen(v => !v)}
-              className="p-2 rounded-xl bg-slate-800/40 text-slate-400 hover:text-slate-100 md:hidden transition-colors"
+              className="p-2 rounded-xl bg-slate-200 text-slate-600 hover:text-slate-900 md:hidden transition-colors"
             >
               <MdMenu size={20} />
             </button>
             <div className="hidden sm:block">
               <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest leading-none">Kullki Wasi Portal</p>
-              <p className="text-sm font-semibold text-slate-200 font-['Outfit'] leading-snug">{breadcrumb}</p>
+              <p className="text-sm font-black text-slate-800 font-['Outfit'] leading-snug">{breadcrumb}</p>
             </div>
           </div>
 
@@ -213,13 +218,13 @@ const DashboardLayout = () => {
           <div className="flex items-center gap-3">
 
             {/* Reloj digital */}
-            <div className="hidden xl:flex items-center gap-2 bg-[#070b13]/70 px-3 py-1.5 rounded-lg border border-slate-800/80">
+            <div className="hidden xl:flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
               <MdWatchLater className="text-[#8DC63F]" size={14} />
-              <span className="text-[11px] font-mono font-bold text-slate-200">
+              <span className="text-[11px] font-mono font-bold text-slate-700">
                 {currentTime.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
               </span>
-              <span className="text-slate-700">│</span>
-              <span className="text-[10px] text-slate-400">
+              <span className="text-slate-300">│</span>
+              <span className="text-[10px] text-slate-500 font-semibold">
                 {currentTime.toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' })}
               </span>
             </div>
@@ -227,18 +232,18 @@ const DashboardLayout = () => {
             {/* Agencia activa */}
             <div className="hidden lg:block text-right leading-tight">
               <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Agencia</p>
-              <p className="text-[11px] font-bold text-[#8DC63F]">{agencyLabel}</p>
+              <p className="text-[11px] font-black text-[#79ac34]">{agencyLabel}</p>
             </div>
 
             {/* Notificaciones */}
             <div className="relative">
               <button
                 onClick={() => { setShowNotifications(v => !v); setShowRoleSwitcher(false); }}
-                className="relative p-2 rounded-xl bg-slate-900/60 border border-slate-800/60 text-slate-400 hover:text-slate-100 hover:border-slate-700 transition-all"
+                className="relative p-2 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-[#8DC63F] hover:border-[#8DC63F]/50 transition-all shadow-sm"
               >
                 <MdNotifications size={18} />
                 {notifications.length > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-1 ring-[#0d1424]" />
+                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white" />
                 )}
               </button>
 
@@ -249,32 +254,32 @@ const DashboardLayout = () => {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 8, scale: 0.96 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-0 mt-2 w-80 glass-panel border border-slate-800/80 rounded-2xl shadow-2xl overflow-hidden z-50"
+                    className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden z-50"
                   >
-                    <div className="px-4 py-3 border-b border-slate-800/60 flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">Centro de Eventos</span>
+                    <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                      <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Centro de Eventos</span>
                       <div className="flex items-center gap-2">
                         {notifications.length > 0 && (
-                          <button onClick={() => setNotifications([])} className="text-[10px] text-slate-500 hover:text-red-400 font-semibold transition-colors">
+                          <button onClick={() => setNotifications([])} className="text-[10px] text-slate-400 hover:text-red-500 font-bold transition-colors">
                             Limpiar
                           </button>
                         )}
-                        <button onClick={() => setShowNotifications(false)} className="text-slate-500 hover:text-slate-300">
+                        <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600">
                           <MdClose size={14} />
                         </button>
                       </div>
                     </div>
                     <div className="max-h-60 overflow-y-auto">
                       {notifications.length > 0 ? notifications.map(n => (
-                        <div key={n.id} className="px-4 py-3 border-b border-slate-800/30 hover:bg-slate-800/20 transition-colors">
-                          <p className="text-xs text-slate-300 font-medium leading-snug">{n.text}</p>
-                          <p className="text-[10px] text-slate-500 mt-1">{n.time}</p>
+                        <div key={n.id} className="px-4 py-3 border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                          <p className="text-xs text-slate-700 font-bold leading-snug">{n.text}</p>
+                          <p className="text-[10px] text-slate-400 mt-1 font-medium">{n.time}</p>
                         </div>
                       )) : (
-                        <div className="p-5 text-center text-xs text-slate-500">Sin alertas recientes</div>
+                        <div className="p-5 text-center text-xs text-slate-400 font-medium">Sin alertas recientes</div>
                       )}
                     </div>
-                    <Link to="/security" onClick={() => setShowNotifications(false)} className="block px-4 py-2.5 text-center text-[11px] font-bold text-[#8DC63F] hover:text-[#79ac34] border-t border-slate-800/60 transition-colors">
+                    <Link to="/security" onClick={() => setShowNotifications(false)} className="block px-4 py-2.5 text-center text-[11px] font-black text-[#79ac34] hover:text-[#6aa832] bg-slate-50 transition-colors">
                       Ver todas las alertas →
                     </Link>
                   </motion.div>
@@ -283,12 +288,12 @@ const DashboardLayout = () => {
             </div>
 
             {/* Avatar / Perfil desktop */}
-            <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-[#0d2347] bg-[#8DC63F] border border-[#8DC63F]/30 hidden md:flex shrink-0">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-slate-900 bg-gradient-to-br from-[#8DC63F] to-[#facc15] shadow-sm hidden md:flex shrink-0">
               {user?.name?.charAt(0) || 'U'}
             </div>
 
             {/* Avatar móvil */}
-            <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-[#0d2347] bg-[#8DC63F] border border-[#8DC63F]/30 md:hidden shrink-0">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-slate-900 bg-gradient-to-br from-[#8DC63F] to-[#facc15] shadow-sm md:hidden shrink-0">
               {user?.name?.charAt(0) || 'U'}
             </div>
           </div>
@@ -313,33 +318,33 @@ const DashboardLayout = () => {
               onClick={() => setMobileOpen(false)}
               className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden"
             />
-            <motion.aside
+              <motion.aside
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 260 }}
-              className="fixed top-0 bottom-0 left-0 w-64 bg-[#0d1424] border-r border-slate-800/70 z-40 md:hidden flex flex-col"
+              className="fixed top-0 bottom-0 left-0 w-64 bg-slate-100 border-r border-slate-300 z-40 md:hidden flex flex-col shadow-2xl"
             >
-              <div className="flex h-16 items-center justify-between px-4 border-b border-slate-800/60 bg-[#080c17] shrink-0">
+              <div className="flex h-16 items-center justify-between px-4 border-b border-slate-300/60 bg-white shrink-0">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#8DC63F] to-[#6aa832] flex items-center justify-center font-black text-[#0d2347] text-sm">KW</div>
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#8DC63F] to-[#facc15] flex items-center justify-center font-black text-slate-900 text-sm">KW</div>
                   <div>
-                    <span className="text-[11px] font-black text-[#8DC63F] tracking-widest uppercase block leading-none">KULLKI WASI</span>
-                    <span className="text-[9px] text-slate-500 uppercase">Accesos</span>
+                    <span className="text-[11px] font-black text-[#79ac34] tracking-widest uppercase block leading-none">KULLKI WASI</span>
+                    <span className="text-[9px] text-slate-500 uppercase font-bold">Accesos</span>
                   </div>
                 </div>
-                <button onClick={() => setMobileOpen(false)} className="p-1.5 rounded-lg bg-slate-800/40 text-slate-400">
+                <button onClick={() => setMobileOpen(false)} className="p-1.5 rounded-lg bg-slate-200 text-slate-500 hover:text-slate-800">
                   <MdClose size={16} />
                 </button>
               </div>
-              <div className="p-3.5 border-b border-slate-800/50 shrink-0">
+              <div className="p-3.5 border-b border-slate-300/60 shrink-0 bg-slate-50/50">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-[#0d2347] bg-[#8DC63F] border-2 border-[#8DC63F]/40 shrink-0">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-slate-900 bg-gradient-to-br from-[#8DC63F] to-[#facc15] shadow-sm shrink-0">
                     {user?.name?.charAt(0) || 'U'}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold text-slate-200 truncate">{user?.name}</p>
-                    <span className="text-[9px] text-[#8DC63F] font-bold uppercase">{user?.roleName}</span>
+                    <p className="text-xs font-bold text-slate-800 truncate">{user?.name}</p>
+                    <span className="text-[9px] text-[#79ac34] font-black uppercase">{user?.roleName}</span>
                   </div>
                 </div>
               </div>
@@ -348,15 +353,15 @@ const DashboardLayout = () => {
                   <Link
                     key={path}
                     to={path}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-100 transition-all"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-200/60 hover:text-slate-800 transition-all"
                   >
-                    <Icon size={18} className="text-slate-500 shrink-0" />
+                    <Icon size={18} className="text-slate-400 shrink-0" />
                     <span>{label}</span>
                   </Link>
                 ))}
               </nav>
-              <div className="p-2.5 border-t border-slate-800/60 shrink-0">
-                <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-red-400/80 hover:bg-red-500/10 hover:text-red-300 transition-all">
+              <div className="p-2.5 border-t border-slate-300/60 shrink-0 bg-slate-50/50">
+                <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-red-500 hover:bg-red-50 hover:text-red-700 transition-all">
                   <MdPowerSettingsNew size={18} className="shrink-0" />
                   <span>Cerrar Sesión</span>
                 </button>
@@ -370,10 +375,10 @@ const DashboardLayout = () => {
       <div className="fixed bottom-5 right-5 z-40">
         <button
           onClick={() => { setShowRoleSwitcher(v => !v); setShowNotifications(false); }}
-          className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#0d1424] border border-[#8DC63F]/50 text-slate-200 shadow-2xl hover:bg-[#0d2347] hover:border-[#8DC63F] transition-all glow-green"
+          className="flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-[#8DC63F]/50 text-slate-700 shadow-xl hover:bg-slate-50 hover:border-[#8DC63F] transition-all"
         >
-          <MdSwapHoriz size={18} className="text-[#8DC63F]" />
-          <span className="text-xs font-bold uppercase tracking-wider font-['Outfit']">Cambiar Rol</span>
+          <MdSwapHoriz size={18} className="text-[#79ac34]" />
+          <span className="text-xs font-black uppercase tracking-wider font-['Outfit']">Cambiar Rol</span>
         </button>
 
         <AnimatePresence>
@@ -383,9 +388,9 @@ const DashboardLayout = () => {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.95 }}
               transition={{ duration: 0.15 }}
-              className="absolute right-0 bottom-12 w-64 glass-panel border border-slate-800/80 rounded-2xl p-3 shadow-2xl"
+              className="absolute right-0 bottom-12 w-64 bg-white border border-slate-200 rounded-2xl p-3 shadow-2xl"
             >
-              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest px-1 pb-2 border-b border-slate-800/60 mb-2">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest px-1 pb-2 border-b border-slate-100 mb-2">
                 Simulador — 8 Perfiles
               </p>
               <div className="space-y-0.5 max-h-64 overflow-y-auto pr-1">
@@ -395,8 +400,8 @@ const DashboardLayout = () => {
                     onClick={() => handleQuickSwitch(role.id)}
                     className={`w-full text-left text-xs px-2.5 py-2 rounded-lg transition-all flex items-center justify-between gap-2 cursor-pointer ${
                       user?.role === role.id
-                        ? 'bg-[#0d2347] text-[#8DC63F] border border-[#8DC63F]/30 font-bold'
-                        : 'hover:bg-slate-800/60 text-slate-400 hover:text-slate-200'
+                        ? 'bg-slate-100 text-[#79ac34] border border-[#8DC63F]/30 font-bold'
+                        : 'hover:bg-slate-50 text-slate-500 hover:text-slate-800 font-medium'
                     }`}
                   >
                     <span className="truncate">{role.name}</span>
