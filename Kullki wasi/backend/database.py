@@ -3,14 +3,21 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# Configuración para conectar a MySQL local usando pymysql
-# Se asume servidor local en el puerto 3306, usuario root sin contraseña, base kullkidb
+# Configuración para conectar a PostgreSQL
+# Prioriza variable de entorno DATABASE_URL (Docker/Producción)
+# Si no existe, usa configuración local para desarrollo
 DATABASE_URL = os.getenv(
     "DATABASE_URL", 
-    "mysql+pymysql://root:@localhost:3306/kullkidb"
+    "postgresql://kullki_user:kullki_pass@localhost:5432/kullki_wasi_db"
 )
 
-engine = create_engine(DATABASE_URL)
+# Configuración del engine con pool para conexiones externas
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,  # Verifica conexiones antes de usarlas
+    pool_recycle=3600,   # Recicla conexiones cada hora
+    echo=False           # Desactiva logs SQL en producción
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
