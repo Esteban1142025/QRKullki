@@ -97,10 +97,10 @@ const DashboardLayout = () => {
   return (
     <div 
       className="flex min-h-screen text-slate-800 overflow-hidden relative bg-cover bg-center bg-no-repeat"
-      style={{ backgroundImage: "url('https://www.sabermassermas.com/wp-content/uploads/2016/07/Cooperativas_interna.png')" }}
+      style={{ backgroundImage: "url('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSY09gcFPVorIMU2Xw2Z_-mlRRJwWGroY_Pxg&s')" }}
     >
       {/* Overlay oscuro/translúcido para la imagen de fondo */}
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[2px]" />
+      <div className="absolute inset-0 bg-slate-100/90 backdrop-blur-[2px]" />
 
       {/* ── SIDEBAR ─────────────────────────────────── */}
       <motion.aside
@@ -117,9 +117,7 @@ const DashboardLayout = () => {
               exit={{ opacity: 0 }}
               className="flex items-center gap-2.5 overflow-hidden"
             >
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#8DC63F] to-[#facc15] flex items-center justify-center font-black text-slate-900 text-sm shrink-0 shadow-md">
-                KW
-              </div>
+              <img src="https://play-lh.googleusercontent.com/G-uc06_SBqaE8a-M7JKQCD-Hpfkvxb1g9X3VPmyngldtTRS-pr69QPW_4zDBe9_6qEw" alt="Logo" className="w-8 h-8 rounded-lg shadow-md object-cover shrink-0 border border-slate-200" />
               <div className="min-w-0">
                 <span className="text-[11px] font-black tracking-widest text-[#79ac34] uppercase block leading-none">KULLKI WASI</span>
                 <span className="text-[9px] text-slate-500 font-bold tracking-wider uppercase">Control de Accesos</span>
@@ -127,9 +125,7 @@ const DashboardLayout = () => {
             </motion.div>
           )}
           {isCollapsed && (
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#8DC63F] to-[#facc15] flex items-center justify-center font-black text-slate-900 text-sm mx-auto shadow-md">
-              KW
-            </div>
+            <img src="https://play-lh.googleusercontent.com/G-uc06_SBqaE8a-M7JKQCD-Hpfkvxb1g9X3VPmyngldtTRS-pr69QPW_4zDBe9_6qEw" alt="Logo" className="w-8 h-8 rounded-lg shadow-md object-cover mx-auto border border-slate-200" />
           )}
           <button
             onClick={() => setIsCollapsed(v => !v)}
@@ -327,7 +323,7 @@ const DashboardLayout = () => {
             >
               <div className="flex h-16 items-center justify-between px-4 border-b border-slate-300/60 bg-white shrink-0">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#8DC63F] to-[#facc15] flex items-center justify-center font-black text-slate-900 text-sm">KW</div>
+                  <img src="https://play-lh.googleusercontent.com/G-uc06_SBqaE8a-M7JKQCD-Hpfkvxb1g9X3VPmyngldtTRS-pr69QPW_4zDBe9_6qEw" alt="Logo" className="w-8 h-8 rounded-lg shadow-md object-cover border border-slate-200" />
                   <div>
                     <span className="text-[11px] font-black text-[#79ac34] tracking-widest uppercase block leading-none">KULLKI WASI</span>
                     <span className="text-[9px] text-slate-500 uppercase font-bold">Accesos</span>

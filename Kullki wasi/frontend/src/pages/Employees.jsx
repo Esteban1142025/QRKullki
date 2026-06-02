@@ -143,10 +143,10 @@ const Employees = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-black text-slate-100 font-['Outfit']">Expedientes de Colaboradores</h2>
-          <p className="text-xs text-slate-400 mt-0.5">Administre el personal, cargos, departamentos y credenciales QR de acceso.</p>
+          <h2 className="text-xl font-black text-slate-800 font-['Outfit']">Expedientes de Colaboradores</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Administre el personal, cargos, departamentos y credenciales QR de acceso.</p>
         </div>
-        <button onClick={openAdd} className="flex items-center gap-2 px-4 py-2.5 bg-[#0d2347] hover:bg-[#163668] border border-[#8DC63F]/35 hover:border-[#8DC63F] rounded-xl text-xs font-bold text-slate-200 tracking-wider transition-all cursor-pointer shadow-lg shrink-0">
+        <button onClick={openAdd} className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-[#8DC63F]/50 hover:border-[#8DC63F] rounded-xl text-xs font-bold text-slate-700 tracking-wider transition-all cursor-pointer shadow-md shrink-0">
           <MdAdd size={16} className="text-[#8DC63F]" />
           AGREGAR COLABORADOR
         </button>
@@ -155,13 +155,13 @@ const Employees = () => {
       {/* Stats strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          ['Total', employees.length, 'text-slate-200'],
-          ['Activos', employees.filter(e => e.status === 'Activo').length, 'text-emerald-400'],
-          ['Inactivos', employees.filter(e => e.status !== 'Activo').length, 'text-red-400'],
-          ['Agencias', new Set(employees.map(e => e.agency)).size, 'text-[#8DC63F]'],
+          ['Total', employees.length, 'text-slate-800'],
+          ['Activos', employees.filter(e => e.status === 'Activo').length, 'text-emerald-600'],
+          ['Inactivos', employees.filter(e => e.status !== 'Activo').length, 'text-red-500'],
+          ['Agencias', new Set(employees.map(e => e.agency)).size, 'text-[#79ac34]'],
         ].map(([label, val, color]) => (
-          <div key={label} className="p-3 rounded-xl glass-panel border border-slate-800/60 flex items-center gap-3">
-            <MdPeople size={20} className="text-slate-600 shrink-0" />
+          <div key={label} className="p-3 rounded-xl glass-panel flex items-center gap-3">
+            <MdPeople size={20} className="text-slate-500 shrink-0" />
             <div>
               <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">{label}</p>
               <p className={`text-xl font-black font-['Outfit'] ${color}`}>{val}</p>
@@ -171,7 +171,7 @@ const Employees = () => {
       </div>
 
       {/* Filters */}
-      <div className="p-4 rounded-xl glass-panel border border-slate-800/70 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+      <div className="p-4 rounded-xl glass-panel grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
         <div className="lg:col-span-2 space-y-1">
           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Buscar</label>
           <div className="relative">
@@ -204,11 +204,11 @@ const Employees = () => {
       </div>
 
       {/* Table */}
-      <div className="rounded-2xl glass-panel border border-slate-800/70 overflow-hidden">
+      <div className="rounded-2xl glass-panel overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="bg-[#080c17] border-b border-slate-800/80">
+              <tr className="bg-slate-50 border-b border-slate-200">
                 {['Colaborador', 'Cédula / ID', 'Cargo', 'Sucursal', 'Estado', 'QR', 'Acciones'].map(h => (
                   <th key={h} className={`px-4 py-3.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap ${h === 'QR' || h === 'Acciones' ? 'text-center' : ''}`}>
                     {h}
@@ -216,58 +216,58 @@ const Employees = () => {
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/30">
+            <tbody className="divide-y divide-slate-100">
               {filtered.length > 0 ? filtered.map(emp => {
-                const role = ROLES[emp.role] ?? { name: emp.role, badgeColor: 'bg-slate-800 text-slate-400 border-slate-700' };
+                const role = ROLES[emp.role] ?? { name: emp.role, badgeColor: 'bg-slate-100 text-slate-500 border-slate-200' };
                 return (
-                  <tr key={emp.id} className="hover:bg-slate-800/15 transition-colors">
+                  <tr key={emp.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-[#0d2347] bg-[#8DC63F] border border-[#8DC63F]/30 shrink-0">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white bg-[#8DC63F] border border-[#8DC63F]/30 shrink-0">
                           {emp.name?.charAt(0) || 'U'}
                         </div>
                         <div>
-                          <p className="font-semibold text-slate-100">{emp.name}</p>
+                          <p className="font-bold text-slate-800">{emp.name}</p>
                           <p className="text-[10px] text-slate-500">{emp.email}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 font-mono">
-                      <p className="text-slate-300">{emp.dni}</p>
-                      <p className="text-[10px] text-slate-600">{emp.id}</p>
+                      <p className="text-slate-700">{emp.dni}</p>
+                      <p className="text-[10px] text-slate-500">{emp.id}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="text-slate-200 font-medium">{emp.department}</p>
+                      <p className="text-slate-800 font-semibold">{emp.department}</p>
                       <span className={`inline-block mt-0.5 text-[8px] font-bold uppercase px-1.5 py-0.25 rounded border ${role.badgeColor}`}>
                         {role.name}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-400">
+                    <td className="px-4 py-3 text-slate-600">
                       {emp.agency === 'MAT' ? 'Matriz' : emp.agency}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
                         emp.status === 'Activo'
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                          : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                          : 'bg-red-50 text-red-600 border border-red-200'
                       }`}>
                         {emp.status}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button onClick={() => { setQrEmployee(emp); setShowQR(true); }}
-                        className="p-2 rounded-lg bg-slate-900 border border-slate-800 hover:border-[#8DC63F]/40 text-slate-500 hover:text-[#8DC63F] transition-all cursor-pointer">
+                        className="p-2 rounded-lg bg-white border border-slate-200 hover:border-[#8DC63F] text-slate-400 hover:text-[#8DC63F] transition-all cursor-pointer shadow-sm">
                         <MdQrCode size={16} />
                       </button>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1.5">
                         <button onClick={() => openEdit(emp)}
-                          className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-600 text-slate-400 hover:text-slate-100 transition-all cursor-pointer">
+                          className="p-1.5 rounded-lg bg-white border border-slate-200 hover:border-slate-300 text-slate-400 hover:text-slate-600 transition-all cursor-pointer shadow-sm">
                           <MdEdit size={13} />
                         </button>
                         <button onClick={() => handleDelete(emp)}
-                          className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-red-500/40 text-slate-500 hover:text-red-400 transition-all cursor-pointer">
+                          className="p-1.5 rounded-lg bg-white border border-slate-200 hover:border-red-200 text-slate-400 hover:text-red-500 transition-all cursor-pointer shadow-sm">
                           <MdDelete size={13} />
                         </button>
                       </div>
@@ -284,7 +284,7 @@ const Employees = () => {
             </tbody>
           </table>
         </div>
-        <div className="px-4 py-2.5 border-t border-slate-800/60 bg-[#080c17]/60 flex items-center justify-between text-[10px] text-slate-500">
+        <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-[10px] text-slate-500">
           <span>Mostrando {filtered.length} de {employees.length} registros</span>
           <span>Cooperativa Kullki Wasi — Segmento 1</span>
         </div>
@@ -292,13 +292,13 @@ const Employees = () => {
 
       {/* ── MODAL: FORM ─────────────────────────────── */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/65 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="w-full max-w-xl glass-panel border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl my-4">
-            <div className="px-6 py-4 border-b border-slate-800/60 bg-[#080c17] flex items-center justify-between">
-              <h3 className="text-sm font-black text-slate-200 font-['Outfit'] uppercase tracking-wider">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="w-full max-w-xl bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xl my-4">
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+              <h3 className="text-sm font-black text-slate-800 font-['Outfit'] uppercase tracking-wider">
                 {editing ? 'Editar Expediente' : 'Nuevo Colaborador'}
               </h3>
-              <button onClick={() => setShowForm(false)} className="text-slate-500 hover:text-slate-200 transition-colors">
+              <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
                 <MdClose size={20} />
               </button>
             </div>
@@ -343,13 +343,13 @@ const Employees = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-800/60">
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
                 <button type="button" onClick={() => setShowForm(false)}
-                  className="px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200 transition-all cursor-pointer">
+                  className="px-4 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-200 transition-all cursor-pointer">
                   Cancelar
                 </button>
                 <button type="submit"
-                  className="flex items-center gap-2 px-4 py-2 bg-[#0d2347] border border-[#8DC63F]/35 hover:border-[#8DC63F] rounded-xl text-xs font-bold text-[#8DC63F] transition-all cursor-pointer">
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-[#8DC63F]/50 hover:border-[#8DC63F] rounded-xl text-xs font-bold text-[#79ac34] shadow-sm transition-all cursor-pointer">
                   <MdSave size={14} /> Guardar Expediente
                 </button>
               </div>
@@ -360,52 +360,52 @@ const Employees = () => {
 
       {/* ── MODAL: QR CREDENTIAL ────────────────────── */}
       {showQR && qrEmployee && (
-        <div className="fixed inset-0 bg-black/65 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-sm glass-panel border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl">
-            <div className="px-5 py-4 border-b border-slate-800/60 bg-[#080c17] flex items-center justify-between">
-              <div className="flex items-center gap-2 text-slate-200">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xl">
+            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-slate-800">
                 <MdBadge size={18} className="text-[#8DC63F]" />
                 <span className="text-xs font-bold uppercase tracking-wider">Credencial de Acceso QR</span>
               </div>
-              <button onClick={() => setShowQR(false)} className="text-slate-500 hover:text-slate-200 transition-colors">
+              <button onClick={() => setShowQR(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
                 <MdClose size={18} />
               </button>
             </div>
 
             <div className="p-6 flex flex-col items-center gap-5">
               {/* ID card */}
-              <div className="w-full p-5 rounded-2xl bg-gradient-to-br from-[#0d2347] to-[#0a1830] border border-[#8DC63F]/15 flex flex-col items-center gap-4">
+              <div className="w-full p-5 rounded-2xl bg-white border border-slate-200 flex flex-col items-center gap-4 shadow-sm relative overflow-hidden">
                 {/* Brand header */}
                 <div className="flex items-center gap-2 w-full">
-                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#8DC63F] to-[#6aa832] flex items-center justify-center font-black text-[#0d2347] text-[11px]">KW</div>
+                  <img src="https://play-lh.googleusercontent.com/G-uc06_SBqaE8a-M7JKQCD-Hpfkvxb1g9X3VPmyngldtTRS-pr69QPW_4zDBe9_6qEw" alt="Logo" className="w-7 h-7 rounded-lg shadow-sm object-cover border border-slate-100" />
                   <div>
-                    <p className="text-[10px] font-black text-[#8DC63F] tracking-widest uppercase leading-none">KULLKI WASI</p>
+                    <p className="text-[10px] font-black text-[#79ac34] tracking-widest uppercase leading-none">KULLKI WASI</p>
                     <p className="text-[8px] text-slate-500 uppercase">Credencial de Acceso</p>
                   </div>
                 </div>
 
                 {/* QR code */}
-                <div className="p-3 bg-white rounded-xl shadow-inner">
-                  <QRCodeSVG value={qrEmployee.qrCode ?? 'KW-NO-QR'} size={150} fgColor="#0d2347" level="H" />
+                <div className="p-3 bg-white rounded-xl shadow-md border border-slate-100">
+                  <QRCodeSVG value={qrEmployee.qrCode ?? 'KW-NO-QR'} size={150} fgColor="#1e293b" level="H" />
                 </div>
 
                 {/* Info */}
                 <div className="text-center">
-                  <p className="font-bold text-slate-100 text-sm">{qrEmployee.name}</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">{qrEmployee.department}</p>
-                  <span className="inline-block mt-1.5 text-[9px] bg-[#0d1424] text-[#8DC63F] font-mono px-2 py-0.5 rounded border border-[#8DC63F]/20 font-bold uppercase">
+                  <p className="font-bold text-slate-800 text-sm">{qrEmployee.name}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">{qrEmployee.department}</p>
+                  <span className="inline-block mt-1.5 text-[9px] bg-slate-100 text-[#79ac34] font-mono px-2 py-0.5 rounded border border-slate-200 font-bold uppercase">
                     {qrEmployee.id}
                   </span>
                 </div>
 
-                <div className="w-full pt-3 border-t border-[#8DC63F]/10 text-center">
-                  <p className="text-[8px] text-slate-600 font-mono break-all">{qrEmployee.qrCode}</p>
+                <div className="w-full pt-3 border-t border-slate-100 text-center">
+                  <p className="text-[8px] text-slate-400 font-mono break-all">{qrEmployee.qrCode}</p>
                 </div>
               </div>
 
               {/* Actions */}
               <button onClick={() => window.print()}
-                className="w-full flex items-center justify-center gap-2 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 rounded-xl text-xs font-semibold text-slate-300 hover:text-slate-100 transition-all cursor-pointer">
+                className="w-full flex items-center justify-center gap-2 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 shadow-sm transition-all cursor-pointer">
                 <MdPrint size={16} className="text-[#8DC63F]" />
                 Imprimir Credencial
               </button>

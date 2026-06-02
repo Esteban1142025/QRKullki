@@ -41,40 +41,40 @@ const Monitoring = () => {
       
       {/* Page Header */}
       <div>
-        <h2 className="text-xl font-black text-slate-100 font-['Outfit']">Monitoreo de Nodos y Red de Terminales</h2>
-        <p className="text-xs text-slate-400 mt-0.5">Supervisión en tiempo real del estado de conexión y latencia de los lectores QR físicos a nivel nacional.</p>
+        <h2 className="text-xl font-black text-slate-800 font-['Outfit']">Monitoreo de Nodos y Red de Terminales</h2>
+        <p className="text-xs text-slate-500 mt-0.5">Supervisión en tiempo real del estado de conexión y latencia de los lectores QR físicos a nivel nacional.</p>
       </div>
 
       {/* KPI Section */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         
-        <div className="p-5 rounded-2xl glass-panel border border-slate-800/70 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 shrink-0">
+        <div className="p-5 rounded-2xl glass-panel flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500 shrink-0">
             <MdDns size={26} />
           </div>
           <div>
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block font-mono mb-0.5">Total Nodos</span>
-            <div className="text-2xl font-black text-slate-100 font-['Outfit']">{devices.length}</div>
+            <div className="text-2xl font-black text-slate-800 font-['Outfit']">{devices.length}</div>
           </div>
         </div>
 
-        <div className="p-5 rounded-2xl glass-panel border border-slate-800/70 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 shrink-0">
+        <div className="p-5 rounded-2xl glass-panel flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-500 shrink-0">
             <MdWifiTethering size={26} />
           </div>
           <div>
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block font-mono mb-0.5">Operativos</span>
-            <div className="text-2xl font-black text-emerald-400 font-['Outfit']">{onlineCount}</div>
+            <div className="text-2xl font-black text-emerald-600 font-['Outfit']">{onlineCount}</div>
           </div>
         </div>
 
-        <div className="p-5 rounded-2xl glass-panel border border-slate-800/70 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center text-red-400 shrink-0">
+        <div className="p-5 rounded-2xl glass-panel flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center text-red-500 shrink-0">
             <MdSensorsOff size={26} />
           </div>
           <div>
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block font-mono mb-0.5">Desconectados</span>
-            <div className="text-2xl font-black text-red-400 font-['Outfit']">{offlineCount}</div>
+            <div className="text-2xl font-black text-red-600 font-['Outfit']">{offlineCount}</div>
           </div>
         </div>
 
@@ -91,20 +91,20 @@ const Monitoring = () => {
               key={device.id} 
               className={`p-5 rounded-2xl glass-panel border transition-all ${
                 isOnline 
-                  ? 'border-slate-800/70 hover:border-[#8DC63F]/40' 
-                  : 'border-red-500/30 bg-red-950/10 hover:border-red-500/50'
+                  ? 'border-slate-200 hover:border-[#8DC63F]/40' 
+                  : 'border-red-300 bg-red-50 hover:border-red-400'
               }`}
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                    isOnline ? 'bg-slate-900 text-slate-400' : 'bg-red-500/10 text-red-400 animate-pulse'
+                    isOnline ? 'bg-slate-100 text-slate-500' : 'bg-red-100 text-red-500 animate-pulse'
                   }`}>
                     <MdRouter size={22} />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-slate-200 leading-tight">{device.name}</h4>
-                    <span className="text-[9px] text-slate-500 font-mono bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 mt-1 inline-block">
+                    <h4 className="text-sm font-bold text-slate-800 leading-tight">{device.name}</h4>
+                    <span className="text-[9px] text-slate-600 font-mono bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 mt-1 inline-block">
                       {device.id}
                     </span>
                   </div>
@@ -114,25 +114,25 @@ const Monitoring = () => {
               <div className="space-y-2 mb-5">
                 <div className="flex justify-between text-xs">
                   <span className="text-slate-500">Agencia:</span>
-                  <span className="font-semibold text-slate-300">{device.agency === 'MAT' ? 'Matriz' : device.agency}</span>
+                  <span className="font-semibold text-slate-800">{device.agency === 'MAT' ? 'Matriz' : device.agency}</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-slate-500">IP Address:</span>
-                  <span className="font-mono text-slate-400">{device.ip}</span>
+                  <span className="font-mono text-slate-600">{device.ip}</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-slate-500">Último Latido:</span>
-                  <span className="font-mono text-slate-400">{new Date(device.lastPulse).toLocaleTimeString('es-EC')}</span>
+                  <span className="font-mono text-slate-600">{new Date(device.lastPulse).toLocaleTimeString('es-EC')}</span>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-4 border-t border-slate-800/60">
+              <div className="flex items-center justify-between pt-4 border-t border-slate-200">
                 <div className="flex items-center gap-1.5">
                   <span className="relative flex h-2.5 w-2.5">
                     {isOnline && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>}
                     <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isOnline ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
                   </span>
-                  <span className={`text-[10px] font-bold uppercase tracking-wider ${isOnline ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider ${isOnline ? 'text-emerald-500' : 'text-red-500'}`}>
                     {device.status}
                   </span>
                 </div>
@@ -140,10 +140,10 @@ const Monitoring = () => {
                 <button
                   onClick={() => handleRestart(device.id)}
                   disabled={restarting}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0d1424] border border-slate-700 hover:border-[#8DC63F] text-xs font-semibold text-slate-300 hover:text-[#8DC63F] transition-all cursor-pointer disabled:opacity-50 shadow-md"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-[#8DC63F] text-xs font-semibold text-slate-600 hover:text-[#79ac34] transition-all cursor-pointer disabled:opacity-50 shadow-sm"
                 >
                   {restarting ? (
-                    <div className="w-3.5 h-3.5 border-2 border-slate-500 border-t-[#8DC63F] rounded-full animate-spin" />
+                    <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-[#8DC63F] rounded-full animate-spin" />
                   ) : (
                     <MdSettingsPower size={14} />
                   )}

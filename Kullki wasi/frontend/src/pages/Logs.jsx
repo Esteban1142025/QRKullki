@@ -5,14 +5,14 @@ import Swal from 'sweetalert2';
 import { MdSearch, MdFileDownload, MdRefresh, MdFilterList } from 'react-icons/md';
 
 const RISK_COLORS = {
-  Alto:  'bg-red-500/10 text-red-400 border-red-500/20',
-  Medio: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-  Bajo:  'bg-slate-800 text-slate-400 border-slate-700',
+  Alto:  'bg-red-50 text-red-600 border-red-200',
+  Medio: 'bg-orange-50 text-orange-600 border-orange-200',
+  Bajo:  'bg-slate-100 text-slate-600 border-slate-200',
 };
 
 const STATUS_COLORS = {
-  Autorizado: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  Denegado:   'bg-red-500/10 text-red-400 border-red-500/20',
+  Autorizado: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+  Denegado:   'bg-red-50 text-red-600 border-red-200',
 };
 
 const Logs = () => {
@@ -84,18 +84,18 @@ const Logs = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-black text-slate-100 font-['Outfit']">Bitácora Institucional de Accesos</h2>
-          <p className="text-xs text-slate-400 mt-0.5">Trazabilidad completa y auditoría centralizada del flujo de personal.</p>
+          <h2 className="text-xl font-black text-slate-800 font-['Outfit']">Bitácora Institucional de Accesos</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Trazabilidad completa y auditoría centralizada del flujo de personal.</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={handleRefresh}
-            className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-500 hover:text-[#8DC63F] transition-all cursor-pointer"
+            className="p-2.5 rounded-xl bg-white border border-slate-200 hover:border-slate-300 text-slate-500 hover:text-[#79ac34] transition-all cursor-pointer shadow-sm"
             title="Refrescar">
             <MdRefresh size={18} />
           </button>
           <button onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#0d2347] hover:bg-[#163668] border border-[#8DC63F]/35 hover:border-[#8DC63F] rounded-xl text-xs font-bold text-slate-200 tracking-wider transition-all cursor-pointer shadow-lg">
-            <MdFileDownload size={16} className="text-[#8DC63F]" />
+            className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-[#79ac34] rounded-xl text-xs font-bold text-slate-700 tracking-wider transition-all cursor-pointer shadow-sm">
+            <MdFileDownload size={16} className="text-[#79ac34]" />
             EXPORTAR CSV
           </button>
         </div>
@@ -104,12 +104,12 @@ const Logs = () => {
       {/* Stats strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          ['Total Registros', logs.length, 'text-slate-100'],
-          ['Autorizados', logs.filter(l => l.status === 'Autorizado').length, 'text-emerald-400'],
-          ['Denegados', logs.filter(l => l.status === 'Denegado').length, 'text-red-400'],
-          ['Riesgo Alto', logs.filter(l => l.risk === 'Alto').length, 'text-orange-400'],
+          ['Total Registros', logs.length, 'text-slate-800'],
+          ['Autorizados', logs.filter(l => l.status === 'Autorizado').length, 'text-emerald-600'],
+          ['Denegados', logs.filter(l => l.status === 'Denegado').length, 'text-red-600'],
+          ['Riesgo Alto', logs.filter(l => l.risk === 'Alto').length, 'text-orange-600'],
         ].map(([label, val, color]) => (
-          <div key={label} className="p-3.5 rounded-xl glass-panel border border-slate-800/60">
+          <div key={label} className="p-3.5 rounded-xl glass-panel border border-slate-200">
             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{label}</p>
             <p className={`text-2xl font-black font-['Outfit'] mt-0.5 ${color}`}>{val}</p>
           </div>
@@ -117,7 +117,7 @@ const Logs = () => {
       </div>
 
       {/* Filters */}
-      <div className="p-4 rounded-xl glass-panel border border-slate-800/70 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="p-4 rounded-xl glass-panel border border-slate-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="space-y-1">
           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
             <MdSearch size={12} /> Buscar
@@ -154,11 +154,11 @@ const Logs = () => {
       </div>
 
       {/* Table */}
-      <div className="rounded-2xl glass-panel border border-slate-800/70 overflow-hidden">
+      <div className="rounded-2xl glass-panel border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left text-xs data-table">
             <thead>
-              <tr className="bg-[#080c17] border-b border-slate-800/80">
+              <tr className="bg-slate-50 border-b border-slate-200">
                 {['ID', 'Fecha / Hora', 'Colaborador', 'Área / Dispositivo', 'Agencia', 'Estado', 'Riesgo'].map(h => (
                   <th key={h} className="px-4 py-3.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
                     {h}
@@ -166,23 +166,23 @@ const Logs = () => {
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/30">
+            <tbody className="divide-y divide-slate-100">
               {filtered.length > 0 ? filtered.map(log => (
-                <tr key={log.id} className="hover:bg-slate-800/15 transition-colors">
+                <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3 font-mono text-slate-600 text-[10px] whitespace-nowrap">{log.id}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <p className="text-slate-300 font-mono">{new Date(log.timestamp).toLocaleDateString('es-EC')}</p>
+                    <p className="text-slate-800 font-mono">{new Date(log.timestamp).toLocaleDateString('es-EC')}</p>
                     <p className="text-[10px] text-slate-500 font-mono">{new Date(log.timestamp).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</p>
                   </td>
                   <td className="px-4 py-3">
-                    <p className="font-semibold text-slate-200">{log.name}</p>
+                    <p className="font-semibold text-slate-800">{log.name}</p>
                     <p className="text-[10px] text-slate-500 font-mono">{log.employeeId}</p>
                   </td>
                   <td className="px-4 py-3 max-w-[200px]">
-                    <p className="text-slate-300 truncate">{log.area}</p>
+                    <p className="text-slate-800 truncate">{log.area}</p>
                     <p className="text-[10px] text-slate-500 truncate">{log.device}</p>
                   </td>
-                  <td className="px-4 py-3 text-slate-400">{log.agency}</td>
+                  <td className="px-4 py-3 text-slate-600">{log.agency}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${STATUS_COLORS[log.status] ?? ''}`}>
                       {log.status}
@@ -204,8 +204,8 @@ const Logs = () => {
             </tbody>
           </table>
         </div>
-        <div className="px-4 py-2.5 border-t border-slate-800/60 bg-[#080c17]/60 flex items-center justify-between text-[10px] text-slate-500">
-          <span>Mostrando <strong className="text-slate-400">{filtered.length}</strong> de <strong className="text-slate-400">{logs.length}</strong> registros</span>
+        <div className="px-4 py-2.5 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-[10px] text-slate-500">
+          <span>Mostrando <strong className="text-slate-700">{filtered.length}</strong> de <strong className="text-slate-700">{logs.length}</strong> registros</span>
           <span className="font-mono">Kullki Wasi — Bitácora Institucional</span>
         </div>
       </div>
