@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { EMPLOYEES, ACCESS_LOGS, SECURITY_ALERTS, QR_DEVICES } from '../data/mockData';
+import { EMPLOYEES, ACCESS_LOGS, SECURITY_ALERTS, QR_DEVICES, AGENCIES } from '../data/mockData';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar, Legend, Cell
@@ -14,7 +14,9 @@ import {
   MdSensors,
   MdReceiptLong,
   MdArrowForward,
-  MdTrendingUp
+  MdTrendingUp,
+  MdStore,
+  MdBadge
 } from 'react-icons/md';
 import { Link } from 'react-router-dom';
 
@@ -58,11 +60,18 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 }
 
-const KPICard = ({ label, value, sub, subColor = 'text-slate-500', icon: Icon, iconBg, iconColor }) => (
-  <div className="p-5 rounded-2xl glass-panel flex items-center justify-between glass-panel-hover cursor-default">
+const KPICard = ({ label, value, sub, subColor = 'text-slate-500', icon: Icon, iconBg, iconColor, trend, trendUp }) => (
+  <div className="card-corporate p-8 flex items-center justify-between cursor-default">
     <div className="space-y-1.5">
-      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">{label}</span>
-      <div className="text-2xl font-black text-slate-800 font-['Outfit']">{value}</div>
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{label}</span>
+        {trend && (
+          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full flex items-center gap-0.5 ${trendUp ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+            {trend} {trendUp ? '↑' : '↓'}
+          </span>
+        )}
+      </div>
+      <div className="text-5xl font-extrabold text-slate-800 font-['Outfit']">{value}</div>
       <span className={`text-[11px] font-bold ${subColor}`}>{sub}</span>
     </div>
     <div className={`w-12 h-12 rounded-xl ${iconBg} flex items-center justify-center ${iconColor} shrink-0`}>
@@ -75,8 +84,10 @@ const DashboardAdmin = () => {
   const { user } = useAuth();
   const [logs, setLogs] = useState(ACCESS_LOGS);
   const activeAlertsCount = SECURITY_ALERTS.filter(a => !a.isResolved).length;
-  const onlineDevicesCount = QR_DEVICES.filter(d => d.status === 'Online').length;
   const activeEmployees   = EMPLOYEES.filter(e => e.status === 'Activo').length;
+  const activeAgencies = AGENCIES.filter(a => a.status === 'Activo').length;
+  const credentialsCount = EMPLOYEES.filter(e => e.qrCode).length;
+  const accessToday = logs.filter(l => new Date(l.timestamp).toDateString() === new Date().toDateString()).length;
 
   useEffect(() => {
     const raw = localStorage.getItem('kw_dynamic_logs');
@@ -89,7 +100,7 @@ const DashboardAdmin = () => {
     <div className="space-y-6">
 
       {/* ── WELCOME BANNER ─────────────────────────── */}
-      <div className="relative overflow-hidden rounded-2xl glass-panel p-6">
+      <div className="card-corporate relative overflow-hidden p-8">
         <div className="absolute top-0 right-0 w-72 h-72 bg-[#8DC63F]/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-56 h-56 bg-[#facc15]/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -124,33 +135,37 @@ const DashboardAdmin = () => {
           icon={MdSupervisedUserCircle}
           iconBg="bg-[#8DC63F]/10"
           iconColor="text-[#8DC63F]"
+          trend="+2%" trendUp={true}
         />
         <KPICard
-          label="Accesos Registrados"
-          value={logs.length}
+          label="Agencias Activas"
+          value={activeAgencies}
+          sub={`${AGENCIES.length} en total`}
+          subColor="text-blue-400"
+          icon={MdStore}
+          iconBg="bg-blue-500/10"
+          iconColor="text-blue-400"
+          trend="Estable" trendUp={true}
+        />
+        <KPICard
+          label="Credenciales Emitidas"
+          value={credentialsCount}
+          sub="Códigos QR activos"
+          subColor="text-orange-400"
+          icon={MdBadge}
+          iconBg="bg-orange-500/10"
+          iconColor="text-orange-400"
+          trend="+5%" trendUp={true}
+        />
+        <KPICard
+          label="Accesos Hoy"
+          value={accessToday || logs.length}
           sub="100% validados por QR"
           subColor="text-emerald-400"
           icon={MdCheckCircle}
           iconBg="bg-emerald-500/10"
           iconColor="text-emerald-400"
-        />
-        <KPICard
-          label="Incidentes Críticos"
-          value={activeAlertsCount}
-          sub="Requieren atención"
-          subColor={activeAlertsCount > 0 ? 'text-red-400 animate-pulse' : 'text-slate-500'}
-          icon={MdWarning}
-          iconBg="bg-red-500/10"
-          iconColor="text-red-400"
-        />
-        <KPICard
-          label="Terminales QR"
-          value={`${onlineDevicesCount}/${QR_DEVICES.length}`}
-          sub={`${QR_DEVICES.length - onlineDevicesCount} offline`}
-          subColor="text-slate-400"
-          icon={MdRouter}
-          iconBg="bg-blue-500/10"
-          iconColor="text-blue-400"
+          trend="+12%" trendUp={true}
         />
       </div>
 
@@ -158,7 +173,7 @@ const DashboardAdmin = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Área chart - flujo por hora */}
-        <div className="p-5 rounded-2xl glass-panel">
+        <div className="card-corporate p-8">
           <div className="flex items-center justify-between mb-5">
             <div>
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
@@ -181,11 +196,11 @@ const DashboardAdmin = () => {
               <AreaChart data={accessTimeData} margin={{ top: 5, right: 5, left: -28, bottom: 0 }}>
                 <defs>
                   <linearGradient id="gAuth" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#8DC63F" stopOpacity={0.25} />
+                    <stop offset="5%"  stopColor="#8DC63F" stopOpacity={0.4} />
                     <stop offset="95%" stopColor="#8DC63F" stopOpacity={0}    />
                   </linearGradient>
                   <linearGradient id="gDeny" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#ef4444" stopOpacity={0.25} />
+                    <stop offset="5%"  stopColor="#ef4444" stopOpacity={0.4} />
                     <stop offset="95%" stopColor="#ef4444" stopOpacity={0}    />
                   </linearGradient>
                 </defs>
@@ -201,7 +216,7 @@ const DashboardAdmin = () => {
         </div>
 
         {/* Bar chart - agencias */}
-        <div className="p-5 rounded-2xl glass-panel">
+        <div className="card-corporate p-8">
           <div className="mb-5">
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
               <MdRouter size={16} className="text-[#8DC63F]" />
@@ -217,12 +232,12 @@ const DashboardAdmin = () => {
                 <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '8px', color: '#64748b' }} />
-                <Bar dataKey="Accesos" radius={[4, 4, 0, 0]}>
+                <Bar dataKey="Accesos" radius={[6, 6, 0, 0]}>
                   {agencyData.map((_, i) => (
                     <Cell key={i} fill={i === 0 ? '#8DC63F' : '#cbd5e1'} />
                   ))}
                 </Bar>
-                <Bar dataKey="Alertas" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Alertas" fill="#ef4444" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -233,7 +248,7 @@ const DashboardAdmin = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* Logs recientes */}
-        <div className="lg:col-span-2 p-5 rounded-2xl glass-panel flex flex-col">
+        <div className="card-corporate p-8 lg:col-span-2 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Trazabilidad Reciente</h3>
@@ -273,10 +288,10 @@ const DashboardAdmin = () => {
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
+                    <span className={`inline-block px-3 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-widest ${
                       ok
-                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
-                        : 'bg-red-500/15 text-red-400 border border-red-500/25'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-red-100 text-red-800'
                     }`}>
                       {log.status}
                     </span>
@@ -291,7 +306,7 @@ const DashboardAdmin = () => {
         </div>
 
         {/* Security checklist */}
-        <div className="p-5 rounded-2xl glass-panel flex flex-col justify-between">
+        <div className="card-corporate p-8 flex flex-col justify-between">
           <div className="space-y-4">
             <div>
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Cumplimiento SEPS</h3>

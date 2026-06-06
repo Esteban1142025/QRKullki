@@ -146,8 +146,8 @@ const Employees = () => {
           <h2 className="text-xl font-black text-slate-800 font-['Outfit']">Expedientes de Colaboradores</h2>
           <p className="text-xs text-slate-500 mt-0.5">Administre el personal, cargos, departamentos y credenciales QR de acceso.</p>
         </div>
-        <button onClick={openAdd} className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-[#8DC63F]/50 hover:border-[#8DC63F] rounded-xl text-xs font-bold text-slate-700 tracking-wider transition-all cursor-pointer shadow-md shrink-0">
-          <MdAdd size={16} className="text-[#8DC63F]" />
+        <button onClick={openAdd} className="btn-primary shrink-0">
+          <MdAdd size={16} />
           AGREGAR COLABORADOR
         </button>
       </div>
@@ -160,7 +160,7 @@ const Employees = () => {
           ['Inactivos', employees.filter(e => e.status !== 'Activo').length, 'text-red-500'],
           ['Agencias', new Set(employees.map(e => e.agency)).size, 'text-[#79ac34]'],
         ].map(([label, val, color]) => (
-          <div key={label} className="p-3 rounded-xl glass-panel flex items-center gap-3">
+          <div key={label} className="card-corporate p-4 flex items-center gap-3">
             <MdPeople size={20} className="text-slate-500 shrink-0" />
             <div>
               <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">{label}</p>
@@ -171,31 +171,30 @@ const Employees = () => {
       </div>
 
       {/* Filters */}
-      <div className="p-4 rounded-xl glass-panel grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+      <div className="card-corporate p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
         <div className="lg:col-span-2 space-y-1">
-          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Buscar</label>
+          <label className="form-label">Buscar</label>
           <div className="relative">
-            <MdSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-            <input type="text" placeholder="Nombre, cédula o ID..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-9" />
+            <input type="text" placeholder="Nombre, cédula o ID..." value={search} onChange={e => setSearch(e.target.value)} className="w-full" />
           </div>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Agencia</label>
-          <select value={filterAgency} onChange={e => setFilterAgency(e.target.value)}>
+          <label className="form-label">Agencia</label>
+          <select value={filterAgency} onChange={e => setFilterAgency(e.target.value)} className="w-full">
             <option value="ALL">Todas</option>
             {AGENCIES.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Departamento</label>
-          <select value={filterDept} onChange={e => setFilterDept(e.target.value)}>
+          <label className="form-label">Departamento</label>
+          <select value={filterDept} onChange={e => setFilterDept(e.target.value)} className="w-full">
             <option value="ALL">Todos</option>
             {departments.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Estado</label>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+          <label className="form-label">Estado</label>
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="w-full">
             <option value="ALL">Todos</option>
             <option value="Activo">Activo</option>
             <option value="Inactivo">Inactivo</option>
@@ -204,24 +203,24 @@ const Employees = () => {
       </div>
 
       {/* Table */}
-      <div className="rounded-2xl glass-panel overflow-hidden">
+      <div className="card-corporate overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="data-table">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
+              <tr>
                 {['Colaborador', 'Cédula / ID', 'Cargo', 'Sucursal', 'Estado', 'QR', 'Acciones'].map(h => (
-                  <th key={h} className={`px-4 py-3.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap ${h === 'QR' || h === 'Acciones' ? 'text-center' : ''}`}>
+                  <th key={h} className={h === 'QR' || h === 'Acciones' ? 'text-center' : ''}>
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {filtered.length > 0 ? filtered.map(emp => {
                 const role = ROLES[emp.role] ?? { name: emp.role, badgeColor: 'bg-slate-100 text-slate-500 border-slate-200' };
                 return (
-                  <tr key={emp.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3">
+                  <tr key={emp.id}>
+                    <td>
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white bg-[#8DC63F] border border-[#8DC63F]/30 shrink-0">
                           {emp.name?.charAt(0) || 'U'}
@@ -232,42 +231,37 @@ const Employees = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 font-mono">
+                    <td className="font-mono">
                       <p className="text-slate-700">{emp.dni}</p>
                       <p className="text-[10px] text-slate-500">{emp.id}</p>
                     </td>
-                    <td className="px-4 py-3">
+                    <td>
                       <p className="text-slate-800 font-semibold">{emp.department}</p>
                       <span className={`inline-block mt-0.5 text-[8px] font-bold uppercase px-1.5 py-0.25 rounded border ${role.badgeColor}`}>
                         {role.name}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-600">
+                    <td className="text-slate-600">
                       {emp.agency === 'MAT' ? 'Matriz' : emp.agency}
                     </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
-                        emp.status === 'Activo'
-                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                          : 'bg-red-50 text-red-600 border border-red-200'
+                    <td>
+                      <span className={`badge ${
+                        emp.status === 'Activo' ? 'badge-active' : 'badge-inactive'
                       }`}>
                         {emp.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <button onClick={() => { setQrEmployee(emp); setShowQR(true); }}
-                        className="p-2 rounded-lg bg-white border border-slate-200 hover:border-[#8DC63F] text-slate-400 hover:text-[#8DC63F] transition-all cursor-pointer shadow-sm">
+                    <td className="text-center">
+                      <button onClick={() => { setQrEmployee(emp); setShowQR(true); }} className="btn-icon text-[#8DC63F]">
                         <MdQrCode size={16} />
                       </button>
                     </td>
-                    <td className="px-4 py-3">
+                    <td>
                       <div className="flex items-center justify-center gap-1.5">
-                        <button onClick={() => openEdit(emp)}
-                          className="p-1.5 rounded-lg bg-white border border-slate-200 hover:border-slate-300 text-slate-400 hover:text-slate-600 transition-all cursor-pointer shadow-sm">
+                        <button onClick={() => openEdit(emp)} className="btn-icon">
                           <MdEdit size={13} />
                         </button>
-                        <button onClick={() => handleDelete(emp)}
-                          className="p-1.5 rounded-lg bg-white border border-slate-200 hover:border-red-200 text-slate-400 hover:text-red-500 transition-all cursor-pointer shadow-sm">
+                        <button onClick={() => handleDelete(emp)} className="btn-icon text-red-500 hover:text-red-600 hover:bg-red-50 border-transparent">
                           <MdDelete size={13} />
                         </button>
                       </div>
@@ -311,46 +305,44 @@ const Employees = () => {
                   ['Teléfono', 'phone', 'text', '0987654321'],
                 ].map(([label, key, type, ph]) => (
                   <div key={key} className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">{label}</label>
-                    <input type={type} placeholder={ph} value={form[key]} onChange={e => field(key, e.target.value)} />
+                    <label className="form-label">{label}</label>
+                    <input type={type} placeholder={ph} value={form[key]} onChange={e => field(key, e.target.value)} className="form-input" />
                   </div>
                 ))}
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Rol de Sistema</label>
-                  <select value={form.role} onChange={e => field('role', e.target.value)}>
+                  <label className="form-label">Rol de Sistema</label>
+                  <select value={form.role} onChange={e => field('role', e.target.value)} className="form-input">
                     {Object.entries(ROLES).map(([id, r]) => <option key={id} value={id}>{r.name}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Departamento</label>
-                  <select value={form.department} onChange={e => field('department', e.target.value)}>
+                  <label className="form-label">Departamento</label>
+                  <select value={form.department} onChange={e => field('department', e.target.value)} className="form-input">
                     {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Agencia Asignada</label>
-                  <select value={form.agency} onChange={e => field('agency', e.target.value)}>
+                  <label className="form-label">Agencia Asignada</label>
+                  <select value={form.agency} onChange={e => field('agency', e.target.value)} className="form-input">
                     {AGENCIES.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Estado Laboral</label>
-                  <select value={form.status} onChange={e => field('status', e.target.value)}>
+                  <label className="form-label">Estado Laboral</label>
+                  <select value={form.status} onChange={e => field('status', e.target.value)} className="form-input">
                     <option value="Activo">Activo</option>
                     <option value="Inactivo">Inactivo</option>
                   </select>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-                <button type="button" onClick={() => setShowForm(false)}
-                  className="px-4 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-200 transition-all cursor-pointer">
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-2">
+                <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">
                   Cancelar
                 </button>
-                <button type="submit"
-                  className="flex items-center gap-2 px-4 py-2 bg-white border border-[#8DC63F]/50 hover:border-[#8DC63F] rounded-xl text-xs font-bold text-[#79ac34] shadow-sm transition-all cursor-pointer">
-                  <MdSave size={14} /> Guardar Expediente
+                <button type="submit" className="btn-primary">
+                  <MdSave size={16} /> Guardar Expediente
                 </button>
               </div>
             </form>
@@ -374,7 +366,7 @@ const Employees = () => {
 
             <div className="p-6 flex flex-col items-center gap-5">
               {/* ID card */}
-              <div className="w-full p-5 rounded-2xl bg-white border border-slate-200 flex flex-col items-center gap-4 shadow-sm relative overflow-hidden">
+              <div className="print-area w-full p-5 rounded-2xl bg-white border border-slate-200 flex flex-col items-center gap-4 shadow-sm relative overflow-hidden">
                 {/* Brand header */}
                 <div className="flex items-center gap-2 w-full">
                   <img src="https://play-lh.googleusercontent.com/G-uc06_SBqaE8a-M7JKQCD-Hpfkvxb1g9X3VPmyngldtTRS-pr69QPW_4zDBe9_6qEw" alt="Logo" className="w-7 h-7 rounded-lg shadow-sm object-cover border border-slate-100" />
@@ -389,7 +381,6 @@ const Employees = () => {
                   <QRCodeSVG value={qrEmployee.qrCode ?? 'KW-NO-QR'} size={150} fgColor="#1e293b" level="H" />
                 </div>
 
-                {/* Info */}
                 <div className="text-center">
                   <p className="font-bold text-slate-800 text-sm">{qrEmployee.name}</p>
                   <p className="text-[11px] text-slate-500 mt-0.5">{qrEmployee.department}</p>
@@ -398,14 +389,28 @@ const Employees = () => {
                   </span>
                 </div>
 
+                <div className="w-full text-center space-y-1">
+                  <div className="flex justify-between items-center text-[8px] uppercase tracking-wider text-slate-500">
+                    <span>Emisión:</span>
+                    <span className="font-bold text-slate-700">{new Date(qrEmployee.hireDate || Date.now()).toLocaleDateString('es-EC')}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[8px] uppercase tracking-wider text-slate-500">
+                    <span>Expira:</span>
+                    <span className="font-bold text-slate-700">{new Date(new Date(qrEmployee.hireDate || Date.now()).setFullYear(new Date(qrEmployee.hireDate || Date.now()).getFullYear() + 1)).toLocaleDateString('es-EC')}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[8px] uppercase tracking-wider text-slate-500">
+                    <span>Estado:</span>
+                    <span className={`font-bold ${qrEmployee.status === 'Activo' ? 'text-[#8DC63F]' : 'text-red-500'}`}>{qrEmployee.status}</span>
+                  </div>
+                </div>
+
                 <div className="w-full pt-3 border-t border-slate-100 text-center">
                   <p className="text-[8px] text-slate-400 font-mono break-all">{qrEmployee.qrCode}</p>
                 </div>
               </div>
 
               {/* Actions */}
-              <button onClick={() => window.print()}
-                className="w-full flex items-center justify-center gap-2 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 shadow-sm transition-all cursor-pointer">
+              <button onClick={() => window.print()} className="btn-secondary w-full justify-center">
                 <MdPrint size={16} className="text-[#8DC63F]" />
                 Imprimir Credencial
               </button>

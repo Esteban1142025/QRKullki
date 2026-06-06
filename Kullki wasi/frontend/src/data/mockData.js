@@ -27,8 +27,8 @@ export const ROLES = {
     id: "seguridad_fisica",
     name: "Seguridad Física",
     badgeColor: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-    description: "Monitoreo en tiempo real, validación QR y control de garita",
-    permissions: ["read_monitoring", "validate_qr", "read_alerts"]
+    description: "Validación QR y control de garita",
+    permissions: ["validate_qr", "read_alerts"]
   },
   auditor: {
     id: "auditor",
@@ -49,7 +49,7 @@ export const ROLES = {
     name: "Técnico TI",
     badgeColor: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
     description: "Gestión técnica de dispositivos QR, red, servidores y logs del sistema",
-    permissions: ["read_monitoring", "write_devices", "read_logs"]
+    permissions: ["read_logs"]
   },
   empleado: {
     id: "empleado",

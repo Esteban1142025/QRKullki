@@ -1,10 +1,43 @@
 import React, { useState } from 'react';
 import { AGENCIES } from '../data/mockData';
 import Swal from 'sweetalert2';
-import { MdStore, MdLocationOn, MdPhone, MdAdd, MdEdit, MdDelete } from 'react-icons/md';
+import { MdStore, MdLocationOn, MdPhone, MdAdd, MdEdit, MdDelete, MdClose, MdSave } from 'react-icons/md';
 
 const Agencies = () => {
-  const [agencies, setAgencies] = useState(AGENCIES);
+  const [agencies, setAgencies] = useState(() => {
+    try {
+      const stored = localStorage.getItem('kw_dynamic_agencies');
+      return stored ? JSON.parse(stored) : AGENCIES;
+    } catch { return AGENCIES; }
+  });
+
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ id: '', name: '', address: '', phone: '', type: 'Sucursal', status: 'Activo' });
+  const [alerts, setAlerts] = useState([]);
+
+  React.useEffect(() => {
+    try {
+      setAlerts(JSON.parse(localStorage.getItem('kw_dynamic_alerts') || '[]').filter(a => !a.isResolved));
+    } catch(e){}
+  }, []);
+
+  const persist = (list) => {
+    setAgencies(list);
+    localStorage.setItem('kw_dynamic_agencies', JSON.stringify(list));
+  };
+
+  const openAdd = () => {
+    setForm({ id: '', name: '', address: '', phone: '', type: 'Sucursal', status: 'Activo' });
+    setEditing(null);
+    setShowForm(true);
+  };
+
+  const openEdit = (agency) => {
+    setForm({ ...agency });
+    setEditing(agency);
+    setShowForm(true);
+  };
 
   const handleDelete = (id) => {
     Swal.fire({
@@ -16,81 +49,151 @@ const Agencies = () => {
       cancelButtonColor: '#334155',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
-      background: '#0d1424',
-      color: '#f1f5f9'
+      background: '#ffffff',
+      color: '#1e293b'
     }).then((result) => {
       if (result.isConfirmed) {
-        setAgencies(agencies.filter(a => a.id !== id));
-        Swal.fire({ icon: 'success', title: 'Agencia Eliminada', timer: 1500, showConfirmButton: false, background: '#0d1424', color: '#f1f5f9' });
+        persist(agencies.filter(a => a.id !== id));
+        Swal.fire({ icon: 'success', title: 'Agencia Eliminada', timer: 1500, showConfirmButton: false });
       }
     });
   };
 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!form.id || !form.name) {
+      Swal.fire({ icon: 'error', title: 'Campos requeridos', text: 'El ID y el Nombre son obligatorios.' });
+      return;
+    }
+
+    // Prevención de duplicados
+    const isDuplicate = agencies.some(a => (a.id === form.id || a.name.toLowerCase() === form.name.toLowerCase()) && a.id !== editing?.id);
+    if (isDuplicate) {
+      Swal.fire({ icon: 'error', title: 'Agencia Duplicada', text: 'Ya existe una agencia con este ID o Nombre.' });
+      return;
+    }
+
+    let updated;
+    if (editing) {
+      updated = agencies.map(a => a.id === editing.id ? form : a);
+    } else {
+      updated = [...agencies, form];
+    }
+    
+    persist(updated);
+    setShowForm(false);
+    Swal.fire({ icon: 'success', title: 'Agencia Guardada', timer: 1500, showConfirmButton: false });
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto">
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-black text-slate-100 font-['Outfit']">Red de Sucursales</h2>
-          <p className="text-xs text-slate-400 mt-0.5">Gestione las agencias físicas y puntos de extensión de la cooperativa.</p>
+          <h2 className="text-2xl font-black text-slate-800 font-['Outfit']">Red de Sucursales</h2>
+          <p className="text-sm text-slate-500 mt-1">Gestione las agencias físicas y puntos de extensión de la cooperativa.</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2.5 bg-[#0d2347] hover:bg-[#163668] border border-[#8DC63F]/40 hover:border-[#8DC63F] rounded-xl text-xs font-bold text-slate-200 tracking-wider transition-all cursor-pointer shadow-lg shrink-0">
-          <MdAdd size={16} className="text-[#8DC63F]" />
+        <button onClick={openAdd} className="btn-primary shrink-0">
+          <MdAdd size={18} />
           NUEVA AGENCIA
         </button>
       </div>
 
+      {/* Mapa Operativo - Semáforo */}
+      <div className="bg-slate-900 rounded-2xl p-6 shadow-xl border border-slate-800 text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-[#84cc16]/5 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="flex items-center gap-2 mb-6">
+          <MdLocationOn size={20} className="text-[#84cc16]" />
+          <h3 className="font-bold font-['Outfit'] tracking-wider uppercase text-sm">Mapa Operativo en Tiempo Real</h3>
+        </div>
+        
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 relative z-10">
+          {agencies.map(agency => {
+            const agencyAlerts = alerts.filter(a => a.agency === agency.name || a.agency === agency.id);
+            let statusColor = 'bg-emerald-500 shadow-emerald-500/40 text-emerald-950'; // Normal
+            let pingColor = 'bg-emerald-400';
+            let statusText = 'Normal';
+
+            if (agency.status !== 'Activo') {
+              statusColor = 'bg-slate-600 shadow-slate-600/40 text-slate-100'; // Offline
+              pingColor = 'bg-slate-500';
+              statusText = 'Desconectado';
+            } else if (agencyAlerts.length > 0) {
+              const hasCritical = agencyAlerts.some(a => a.severity === 'Crítica');
+              if (hasCritical) {
+                statusColor = 'bg-red-500 shadow-red-500/40 text-white'; // Crítico
+                pingColor = 'bg-red-400';
+                statusText = 'Crítico';
+              } else {
+                statusColor = 'bg-amber-400 shadow-amber-400/40 text-amber-950'; // Advertencia
+                pingColor = 'bg-amber-300';
+                statusText = 'Alerta';
+              }
+            }
+
+            return (
+              <div key={agency.id} className={`${statusColor} rounded-xl p-3 shadow-lg flex flex-col justify-between aspect-video transition-all`}>
+                <div className="flex justify-between items-start">
+                  <span className="text-[10px] font-black uppercase tracking-widest opacity-80">{agency.id}</span>
+                  <span className="relative flex h-2 w-2">
+                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${pingColor}`}></span>
+                    <span className={`relative inline-flex rounded-full h-2 w-2 ${pingColor}`}></span>
+                  </span>
+                </div>
+                <div>
+                  <p className="font-bold text-xs truncate" title={agency.name}>{agency.name}</p>
+                  <p className="text-[9px] font-bold uppercase mt-0.5 opacity-80">{statusText}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {agencies.map(agency => (
-          <div key={agency.id} className="p-5 rounded-2xl glass-panel border border-slate-800/70 glass-panel-hover flex flex-col justify-between h-full group">
+          <div key={agency.id} className="card-corporate p-6 flex flex-col justify-between h-full group hover:-translate-y-1 transition-transform duration-300">
             
             <div className="mb-4">
-              <div className="flex items-start justify-between mb-3">
+              <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#8DC63F] to-[#6aa832] flex items-center justify-center text-[#0d2347] shadow-lg shadow-[#8DC63F]/20">
-                    <MdStore size={22} />
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#84cc16] to-[#facc15] flex items-center justify-center text-white shadow-md">
+                    <MdStore size={24} />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-100">{agency.name}</h3>
-                    <span className="text-[10px] text-[#8DC63F] font-bold tracking-widest uppercase">{agency.id}</span>
+                    <h3 className="font-bold text-slate-800 text-lg">{agency.name}</h3>
+                    <span className="text-[11px] text-[#65a30d] font-bold tracking-widest uppercase bg-[#84cc16]/10 px-2 py-0.5 rounded border border-[#84cc16]/20">{agency.id}</span>
                   </div>
                 </div>
-                <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${
-                  agency.type === 'Principal' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' :
-                  agency.type === 'Extensión' ? 'bg-orange-500/10 text-orange-400 border-orange-500/30' :
-                  'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                }`}>
-                  {agency.type}
-                </span>
               </div>
 
-              <div className="space-y-2 mt-4 text-xs">
-                <div className="flex items-start gap-2 text-slate-400">
-                  <MdLocationOn size={16} className="shrink-0 mt-0.5" />
-                  <span className="leading-relaxed">{agency.address}</span>
+              <div className="space-y-3 mt-5 text-sm">
+                <div className="flex items-start gap-2 text-slate-500">
+                  <MdLocationOn size={18} className="shrink-0 mt-0.5 text-slate-400" />
+                  <span className="leading-relaxed font-medium">{agency.address}</span>
                 </div>
-                <div className="flex items-center gap-2 text-slate-400">
-                  <MdPhone size={16} className="shrink-0" />
-                  <span className="font-mono">{agency.phone}</span>
+                <div className="flex items-center gap-2 text-slate-500">
+                  <MdPhone size={18} className="shrink-0 text-slate-400" />
+                  <span className="font-mono font-bold">{agency.phone}</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-slate-800/60 mt-auto">
-              <div className="flex items-center gap-1.5">
-                <span className="relative flex h-2.5 w-2.5">
+            <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-auto">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-3 w-3">
                   <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${agency.status === 'Activo' ? 'bg-emerald-500 animate-ping' : 'bg-red-500'}`}></span>
-                  <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${agency.status === 'Activo' ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+                  <span className={`relative inline-flex rounded-full h-3 w-3 ${agency.status === 'Activo' ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
                 </span>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{agency.status}</span>
+                <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">{agency.status}</span>
               </div>
               
-              <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button className="p-1.5 rounded-lg bg-slate-900 border border-slate-700 hover:border-slate-500 text-slate-400 transition-all">
-                  <MdEdit size={14} />
+              <div className="flex gap-2">
+                <button onClick={() => openEdit(agency)} className="btn-icon">
+                  <MdEdit size={16} />
                 </button>
-                <button onClick={() => handleDelete(agency.id)} className="p-1.5 rounded-lg bg-slate-900 border border-slate-700 hover:border-red-500/50 hover:text-red-400 text-slate-400 transition-all">
-                  <MdDelete size={14} />
+                <button onClick={() => handleDelete(agency.id)} className="btn-icon text-red-500 hover:bg-red-50 hover:text-red-600 border-transparent">
+                  <MdDelete size={16} />
                 </button>
               </div>
             </div>
@@ -98,6 +201,61 @@ const Agencies = () => {
           </div>
         ))}
       </div>
+
+      {showForm && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xl">
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+              <h3 className="text-sm font-black text-slate-800 font-['Outfit'] uppercase tracking-wider">
+                {editing ? 'Editar Agencia' : 'Nueva Agencia'}
+              </h3>
+              <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600">
+                <MdClose size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1 col-span-2 sm:col-span-1">
+                  <label className="form-label">ID (Código)</label>
+                  <input type="text" value={form.id} onChange={e => setForm({...form, id: e.target.value.toUpperCase()})} placeholder="Ej: MAT" disabled={!!editing} className="form-input" />
+                </div>
+                <div className="space-y-1 col-span-2 sm:col-span-1">
+                  <label className="form-label">Tipo</label>
+                  <select value={form.type} onChange={e => setForm({...form, type: e.target.value})} className="form-input">
+                    <option value="Principal">Principal</option>
+                    <option value="Sucursal">Sucursal</option>
+                    <option value="Extensión">Extensión</option>
+                  </select>
+                </div>
+                <div className="space-y-1 col-span-2">
+                  <label className="form-label">Nombre</label>
+                  <input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="Ej: Matriz Ambato" className="form-input" />
+                </div>
+                <div className="space-y-1 col-span-2">
+                  <label className="form-label">Dirección</label>
+                  <input type="text" value={form.address} onChange={e => setForm({...form, address: e.target.value})} className="form-input" />
+                </div>
+                <div className="space-y-1 col-span-2 sm:col-span-1">
+                  <label className="form-label">Teléfono</label>
+                  <input type="text" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} className="form-input" />
+                </div>
+                <div className="space-y-1 col-span-2 sm:col-span-1">
+                  <label className="form-label">Estado</label>
+                  <select value={form.status} onChange={e => setForm({...form, status: e.target.value})} className="form-input">
+                    <option value="Activo">Activo</option>
+                    <option value="Inactivo">Inactivo</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end pt-4 mt-2">
+                <button type="submit" className="btn-primary">
+                  <MdSave size={18} /> Guardar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

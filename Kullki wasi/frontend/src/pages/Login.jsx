@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
@@ -10,12 +10,69 @@ const Login = () => {
   const [dniOrEmail, setDniOrEmail] = useState('');
   const [password, setPassword]     = useState('');
   const [loading, setLoading]       = useState(false);
+  
+  // Security logic: Lockout
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutTime, setLockoutTime] = useState(null);
+  const [remainingTime, setRemainingTime] = useState(0);
+
+  useEffect(() => {
+    const attempts = parseInt(localStorage.getItem('kw_failed_attempts') || '0');
+    const lockout = localStorage.getItem('kw_lockout_time');
+    setFailedAttempts(attempts);
+    if (lockout) {
+      const lockDate = new Date(lockout).getTime();
+      const now = new Date().getTime();
+      if (lockDate > now) {
+        setLockoutTime(lockDate);
+      } else {
+        localStorage.removeItem('kw_failed_attempts');
+        localStorage.removeItem('kw_lockout_time');
+        setFailedAttempts(0);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (lockoutTime) {
+      const interval = setInterval(() => {
+        const now = new Date().getTime();
+        if (lockoutTime > now) {
+          setRemainingTime(Math.ceil((lockoutTime - now) / 1000));
+        } else {
+          setLockoutTime(null);
+          setRemainingTime(0);
+          localStorage.removeItem('kw_failed_attempts');
+          localStorage.removeItem('kw_lockout_time');
+          setFailedAttempts(0);
+          clearInterval(interval);
+        }
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [lockoutTime]);
 
   const fireSwalLight = (opts) =>
     Swal.fire({ background: '#ffffff', color: '#1e293b', confirmButtonColor: '#15803d', ...opts });
 
+  const recordFailedAudit = (userIdentifier) => {
+    const log = {
+      id: `LOG-${Date.now()}`, timestamp: new Date().toISOString(),
+      employeeId: userIdentifier, name: 'Desconocido', role: 'N/A',
+      agency: 'N/A', area: 'Plataforma Web', device: 'Navegador Web',
+      status: 'Denegado', details: `Intento de inicio de sesión fallido. Credenciales incorrectas.`, risk: 'Alto'
+    };
+    const logs = JSON.parse(localStorage.getItem('kw_dynamic_logs') || '[]');
+    localStorage.setItem('kw_dynamic_logs', JSON.stringify([log, ...logs]));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (lockoutTime) {
+      fireSwalLight({ icon: 'error', title: 'Cuenta Bloqueada temporalmente', text: `Espere ${remainingTime} segundos para reintentar.`, confirmButtonColor: '#ef4444' });
+      return;
+    }
+
     if (!dniOrEmail || !password) {
       fireSwalLight({ icon: 'warning', title: 'Campos requeridos', text: 'Por favor, ingrese su usuario y contraseña.' });
       return;
@@ -23,9 +80,24 @@ const Login = () => {
     setLoading(true);
     try {
       await login(dniOrEmail, password);
+      // Success, clear attempts
+      localStorage.removeItem('kw_failed_attempts');
+      localStorage.removeItem('kw_lockout_time');
       navigate('/dashboard');
     } catch (err) {
-      fireSwalLight({ icon: 'error', title: 'Acceso Denegado', text: 'Las credenciales ingresadas son incorrectas.', confirmButtonColor: '#ef4444' });
+      const newAttempts = failedAttempts + 1;
+      setFailedAttempts(newAttempts);
+      localStorage.setItem('kw_failed_attempts', newAttempts.toString());
+      recordFailedAudit(dniOrEmail);
+
+      if (newAttempts >= 3) {
+        const blockUntil = new Date().getTime() + 30000; // block for 30s
+        setLockoutTime(blockUntil);
+        localStorage.setItem('kw_lockout_time', new Date(blockUntil).toISOString());
+        fireSwalLight({ icon: 'error', title: 'Bloqueo de Seguridad', text: 'Múltiples intentos fallidos. Sistema bloqueado temporalmente por 30 segundos.', confirmButtonColor: '#ef4444' });
+      } else {
+        fireSwalLight({ icon: 'error', title: 'Acceso Denegado', text: `Credenciales incorrectas. Intento ${newAttempts} de 3.`, confirmButtonColor: '#ef4444' });
+      }
     } finally {
       setLoading(false);
     }
@@ -41,15 +113,12 @@ const Login = () => {
         backgroundAttachment: 'fixed'
       }}
     >
-      {/* Capa superpuesta (Overlay) gris oscuro neutro, no verde y no totalmente negro para que la imagen se vea perfecta */}
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]"></div>
 
       <div className="relative z-10 w-full max-w-[420px]">
         
-        {/* Tarjeta Central */}
         <div className="bg-white/95 backdrop-blur-md shadow-2xl rounded-2xl p-8 md:p-10 border border-white/20">
           
-          {/* Logo y Encabezado */}
           <div className="flex flex-col items-center mb-8">
             <img 
               src="https://play-lh.googleusercontent.com/G-uc06_SBqaE8a-M7JKQCD-Hpfkvxb1g9X3VPmyngldtTRS-pr69QPW_4zDBe9_6qEw" 
@@ -60,14 +129,19 @@ const Login = () => {
             <p className="text-sm font-medium text-slate-500 mt-1 uppercase tracking-wider">Portal Institucional</p>
           </div>
 
+          {lockoutTime ? (
+            <div className="bg-red-50 border border-red-200 text-red-600 p-4 rounded-xl text-center mb-6 shadow-sm">
+              <p className="font-bold text-sm mb-1">Bloqueo de Seguridad Activo</p>
+              <p className="text-xs">Por favor espere <strong>{remainingTime}s</strong> para intentar de nuevo.</p>
+            </div>
+          ) : null}
+
           <form onSubmit={handleSubmit} className="space-y-5">
             
-            {/* Input Usuario */}
             <div>
               <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
                 Usuario o Cédula
               </label>
-              {/* Uso de Flexbox para agrupar ícono y campo */}
               <div className="flex items-center bg-white border border-slate-300 rounded-xl focus-within:border-[#15803d] focus-within:ring-2 focus-within:ring-[#15803d]/20 transition-all overflow-hidden shadow-sm">
                 <div className="pl-4 pr-2 text-slate-400 flex items-center justify-center">
                   <MdOutlinePersonOutline size={20} />
@@ -77,13 +151,12 @@ const Login = () => {
                   placeholder="Ej: 1804293840"
                   value={dniOrEmail}
                   onChange={e => setDniOrEmail(e.target.value)}
-                  disabled={loading}
+                  disabled={loading || lockoutTime !== null}
                   className="w-full py-3.5 pr-4 bg-transparent outline-none text-sm text-slate-800 placeholder-slate-400 disabled:bg-slate-50"
                 />
               </div>
             </div>
 
-            {/* Input Password */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -102,13 +175,12 @@ const Login = () => {
                   placeholder="••••••••••••"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  disabled={loading}
+                  disabled={loading || lockoutTime !== null}
                   className="w-full py-3.5 pr-4 bg-transparent outline-none text-sm text-slate-800 placeholder-slate-400 disabled:bg-slate-50"
                 />
               </div>
             </div>
 
-            {/* Mantener sesión */}
             <div className="flex items-center pt-1 pb-2">
               <label className="flex items-center gap-2.5 cursor-pointer">
                 <input 
@@ -119,10 +191,9 @@ const Login = () => {
               </label>
             </div>
 
-            {/* Botón Ingresar */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || lockoutTime !== null}
               className="w-full py-3.5 bg-gradient-to-r from-[#166534] to-[#15803d] hover:from-[#14532d] hover:to-[#166534] text-white rounded-xl font-bold shadow-md hover:shadow-lg hover:shadow-[#15803d]/20 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {loading ? (
@@ -138,7 +209,6 @@ const Login = () => {
           </form>
         </div>
 
-        {/* Footer Legal adaptado para fondo oscuro (texto blanco/gris claro) */}
         <div className="mt-8 text-center relative z-10">
           <p className="text-xs text-slate-300 font-medium leading-relaxed drop-shadow-md">
             Acceso restringido a personal de <span className="font-bold text-white">Kullki Wasi Ltda.</span><br/>

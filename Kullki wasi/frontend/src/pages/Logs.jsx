@@ -2,17 +2,17 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ACCESS_LOGS, AGENCIES } from '../data/mockData';
 import Swal from 'sweetalert2';
-import { MdSearch, MdFileDownload, MdRefresh, MdFilterList } from 'react-icons/md';
+import { MdSearch, MdFileDownload, MdRefresh, MdFilterList, MdPictureAsPdf, MdChevronLeft, MdChevronRight } from 'react-icons/md';
 
 const RISK_COLORS = {
-  Alto:  'bg-red-50 text-red-600 border-red-200',
-  Medio: 'bg-orange-50 text-orange-600 border-orange-200',
-  Bajo:  'bg-slate-100 text-slate-600 border-slate-200',
+  Alto:  'badge-inactive',
+  Medio: 'badge-pending',
+  Bajo:  'badge-active',
 };
 
 const STATUS_COLORS = {
-  Autorizado: 'bg-emerald-50 text-emerald-600 border-emerald-200',
-  Denegado:   'bg-red-50 text-red-600 border-red-200',
+  Autorizado: 'badge-active',
+  Denegado:   'badge-inactive',
 };
 
 const Logs = () => {
@@ -22,6 +22,8 @@ const Logs = () => {
   const [filterAgency, setAgency]   = useState('ALL');
   const [filterStatus, setStatus]   = useState('ALL');
   const [filterRisk, setRisk]       = useState('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const loadLogs = useCallback(() => {
     try {
@@ -47,6 +49,12 @@ const Logs = () => {
       && (filterStatus === 'ALL' || l.status === filterStatus)
       && (filterRisk   === 'ALL' || l.risk   === filterRisk);
   });
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const currentLogs = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  // Reiniciar página si cambian los filtros
+  useEffect(() => { setCurrentPage(1); }, [search, filterAgency, filterStatus, filterRisk]);
 
   const handleRefresh = () => {
     loadLogs();
@@ -78,6 +86,10 @@ const Logs = () => {
     });
   };
 
+  const handleExportPDF = () => {
+    window.print();
+  };
+
   return (
     <div className="space-y-6">
 
@@ -88,15 +100,16 @@ const Logs = () => {
           <p className="text-xs text-slate-500 mt-0.5">Trazabilidad completa y auditoría centralizada del flujo de personal.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={handleRefresh}
-            className="p-2.5 rounded-xl bg-white border border-slate-200 hover:border-slate-300 text-slate-500 hover:text-[#79ac34] transition-all cursor-pointer shadow-sm"
-            title="Refrescar">
+          <button onClick={handleRefresh} className="btn-icon" title="Refrescar">
             <MdRefresh size={18} />
           </button>
-          <button onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-[#79ac34] rounded-xl text-xs font-bold text-slate-700 tracking-wider transition-all cursor-pointer shadow-sm">
+          <button onClick={handleExport} className="btn-secondary">
             <MdFileDownload size={16} className="text-[#79ac34]" />
-            EXPORTAR CSV
+            Exportar CSV
+          </button>
+          <button onClick={handleExportPDF} className="btn-danger text-white hover:text-white" style={{color: 'white'}}>
+            <MdPictureAsPdf size={16} />
+            Exportar PDF
           </button>
         </div>
       </div>
@@ -109,7 +122,7 @@ const Logs = () => {
           ['Denegados', logs.filter(l => l.status === 'Denegado').length, 'text-red-600'],
           ['Riesgo Alto', logs.filter(l => l.risk === 'Alto').length, 'text-orange-600'],
         ].map(([label, val, color]) => (
-          <div key={label} className="p-3.5 rounded-xl glass-panel border border-slate-200">
+          <div key={label} className="card-corporate p-4">
             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{label}</p>
             <p className={`text-2xl font-black font-['Outfit'] mt-0.5 ${color}`}>{val}</p>
           </div>
@@ -117,34 +130,33 @@ const Logs = () => {
       </div>
 
       {/* Filters */}
-      <div className="p-4 rounded-xl glass-panel border border-slate-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="card-corporate p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
         <div className="space-y-1">
-          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-            <MdSearch size={12} /> Buscar
+          <label className="form-label flex items-center gap-1">
+            <MdSearch size={14} /> Buscar
           </label>
           <div className="relative">
-            <MdSearch size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
-            <input type="text" placeholder="Nombre, ID o código..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-8" />
+            <input type="text" placeholder="Nombre, ID o código..." value={search} onChange={e => setSearch(e.target.value)} className="w-full" />
           </div>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Agencia</label>
-          <select value={filterAgency} onChange={e => setAgency(e.target.value)}>
+          <label className="form-label">Agencia</label>
+          <select value={filterAgency} onChange={e => setAgency(e.target.value)} className="w-full">
             <option value="ALL">Todas las Agencias</option>
             {AGENCIES.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Estado</label>
-          <select value={filterStatus} onChange={e => setStatus(e.target.value)}>
+          <label className="form-label">Estado</label>
+          <select value={filterStatus} onChange={e => setStatus(e.target.value)} className="w-full">
             <option value="ALL">Todos</option>
             <option value="Autorizado">Autorizado</option>
             <option value="Denegado">Denegado</option>
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Nivel de Riesgo</label>
-          <select value={filterRisk} onChange={e => setRisk(e.target.value)}>
+          <label className="form-label">Nivel de Riesgo</label>
+          <select value={filterRisk} onChange={e => setRisk(e.target.value)} className="w-full">
             <option value="ALL">Todos</option>
             <option value="Bajo">Bajo</option>
             <option value="Medio">Medio</option>
@@ -154,7 +166,7 @@ const Logs = () => {
       </div>
 
       {/* Table */}
-      <div className="rounded-2xl glass-panel border border-slate-200 overflow-hidden">
+      <div className="card-corporate overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs data-table">
             <thead>
@@ -167,7 +179,7 @@ const Logs = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filtered.length > 0 ? filtered.map(log => (
+              {currentLogs.length > 0 ? currentLogs.map(log => (
                 <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3 font-mono text-slate-600 text-[10px] whitespace-nowrap">{log.id}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
@@ -184,12 +196,12 @@ const Logs = () => {
                   </td>
                   <td className="px-4 py-3 text-slate-600">{log.agency}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${STATUS_COLORS[log.status] ?? ''}`}>
+                    <span className={`badge ${STATUS_COLORS[log.status] ?? ''}`}>
                       {log.status}
                     </span>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${RISK_COLORS[log.risk] ?? RISK_COLORS.Bajo}`}>
+                    <span className={`badge ${RISK_COLORS[log.risk] ?? RISK_COLORS.Bajo}`}>
                       {log.risk}
                     </span>
                   </td>
@@ -204,9 +216,26 @@ const Logs = () => {
             </tbody>
           </table>
         </div>
-        <div className="px-4 py-2.5 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-[10px] text-slate-500">
-          <span>Mostrando <strong className="text-slate-700">{filtered.length}</strong> de <strong className="text-slate-700">{logs.length}</strong> registros</span>
-          <span className="font-mono">Kullki Wasi — Bitácora Institucional</span>
+        <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3 text-[10px] text-slate-500">
+          <span>Mostrando <strong className="text-slate-700">{currentLogs.length}</strong> de <strong className="text-slate-700">{filtered.length}</strong> registros filtrados</span>
+          
+          <div className="flex items-center gap-1">
+            <button 
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="btn-icon disabled:opacity-50"
+            >
+              <MdChevronLeft size={16} />
+            </button>
+            <span className="px-2 font-bold text-slate-700">Página {currentPage} de {totalPages || 1}</span>
+            <button 
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages || totalPages === 0}
+              className="btn-icon disabled:opacity-50"
+            >
+              <MdChevronRight size={16} />
+            </button>
+          </div>
         </div>
       </div>
 

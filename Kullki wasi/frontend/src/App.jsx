@@ -16,7 +16,6 @@ import QRScanner from './pages/QRScanner';
 import RestrictedAreas from './pages/RestrictedAreas';
 import Logs from './pages/Logs';
 import Audit from './pages/Audit';
-import Monitoring from './pages/Monitoring';
 import Security from './pages/Security';
 import Agencies from './pages/Agencies';
 import Settings from './pages/Settings';
@@ -80,11 +79,6 @@ function App() {
               </ProtectedRoute>
             } />
             
-            <Route path="monitoring" element={
-              <ProtectedRoute allowedRoles={['admin', 'tecnico_ti', 'seguridad_fisica']}>
-                <Monitoring />
-              </ProtectedRoute>
-            } />
             
             <Route path="security" element={
               <ProtectedRoute allowedRoles={['admin', 'riesgos', 'seguridad_fisica']}>

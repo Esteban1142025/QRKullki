@@ -39,7 +39,13 @@ const QRScanner = () => {
   const validate = (qrString) => {
     if (!qrString.trim()) {
       Swal.fire({ icon: 'warning', title: 'Entrada Vacía', text: 'Ingrese o seleccione un código QR.',
-        background: '#0d1424', color: '#f1f5f9' });
+        background: '#ffffff', color: '#1e293b' });
+      return;
+    }
+
+    if (device.status !== 'Online') {
+      Swal.fire({ icon: 'error', title: 'Terminal Offline', text: 'Este terminal se encuentra desconectado. No puede procesar accesos.',
+        background: '#ffffff', color: '#1e293b' });
       return;
     }
 
@@ -110,7 +116,7 @@ const QRScanner = () => {
         area: area.name,
         agency: device.agency === 'MAT' ? 'Matriz Ambato' : `Agencia (${device.agency})`,
         details: `Denegación en ${device.name}: ${reason}`,
-        isResolved: false, resolvedBy: '',
+        status: 'Pendiente', responsibleUserId: null, history: [{ date: ts, user: 'Sistema', action: 'Alerta generada' }]
       };
       const alerts = JSON.parse(localStorage.getItem('kw_dynamic_alerts') || '[]');
       localStorage.setItem('kw_dynamic_alerts', JSON.stringify([alert, ...alerts]));

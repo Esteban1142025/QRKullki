@@ -13,8 +13,6 @@ const PERMISSIONS = [
   { id: 'read_logs',       label: 'Consultar Bitácoras',           category: 'Auditoría' },
   { id: 'read_alerts',     label: 'Ver Alertas Críticas',          category: 'Seguridad' },
   { id: 'write_security',  label: 'Resolver Incidentes',           category: 'Seguridad' },
-  { id: 'read_monitoring', label: 'Monitorear Terminales QR',      category: 'Monitoreo' },
-  { id: 'write_devices',   label: 'Configurar Dispositivos',       category: 'Monitoreo' },
   { id: 'validate_qr',     label: 'Simular Escaneo QR',            category: 'Accesos'   },
   { id: 'read_reports',    label: 'Generar Reportes PDF/XLS',      category: 'Auditoría' },
 ];
@@ -24,7 +22,6 @@ const CATEGORY_COLORS = {
   Personal:  'text-blue-600 bg-blue-100 border-blue-200',
   Auditoría: 'text-purple-600 bg-purple-100 border-purple-200',
   Seguridad: 'text-orange-600 bg-orange-100 border-orange-200',
-  Monitoreo: 'text-cyan-600 bg-cyan-100 border-cyan-200',
   Accesos:   'text-[#65a30d] bg-[#84cc16]/20 border-[#84cc16]/30',
 };
 
