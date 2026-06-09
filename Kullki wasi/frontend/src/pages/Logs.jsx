@@ -17,9 +17,11 @@ const STATUS_COLORS = {
 const Logs = () => {
   const [logs, setLogs]             = useState([]);
   const [agencies, setAgencies]     = useState([]);
+  const [areas, setAreas]           = useState([]);
   const [loading, setLoading]       = useState(true);
   const [search, setSearch]         = useState('');
   const [filterAgency, setAgency]   = useState('ALL');
+  const [filterArea, setArea]       = useState('ALL');
   const [filterStatus, setStatus]   = useState('ALL');
   const [filterRisk, setRisk]       = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
@@ -28,12 +30,14 @@ const Logs = () => {
   const loadLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const [logsRes, agRes] = await Promise.all([
+      const [logsRes, agRes, areaRes] = await Promise.all([
         apiClient.get('/audit-logs'),
         apiClient.get('/agencias'),
+        apiClient.get('/areas'),
       ]);
       setLogs(logsRes.data);
       setAgencies(agRes.data);
+      setAreas(areaRes.data);
     } catch (err) {
       console.error('Error al cargar bitácora:', err);
     } finally {
@@ -43,13 +47,18 @@ const Logs = () => {
 
   useEffect(() => { loadLogs(); }, [loadLogs]);
 
+  // Todas las áreas del sistema (desde la DB, no solo las que aparecen en logs)
+  const allAreas = areas.map(a => a.name).sort();
+
   const filtered = logs.filter(l => {
     const q = search.toLowerCase();
-    const matchQ = (l.name || '').toLowerCase().includes(q) ||
+    const matchQ = (l.name     || '').toLowerCase().includes(q) ||
                    (l.employeeId || '').toLowerCase().includes(q) ||
-                   (l.id || '').toLowerCase().includes(q);
+                   (l.id       || '').toLowerCase().includes(q) ||
+                   (l.area     || '').toLowerCase().includes(q);
     return matchQ
       && (filterAgency === 'ALL' || l.agency === filterAgency)
+      && (filterArea   === 'ALL' || l.area   === filterArea)
       && (filterStatus === 'ALL' || l.status === filterStatus)
       && (filterRisk   === 'ALL' || l.risk   === filterRisk);
   });
@@ -57,7 +66,110 @@ const Logs = () => {
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
   const currentLogs = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  useEffect(() => { setCurrentPage(1); }, [search, filterAgency, filterStatus, filterRisk]);
+  useEffect(() => { setCurrentPage(1); }, [search, filterAgency, filterArea, filterStatus, filterRisk]);
+
+  const handlePrintPDF = () => {
+    const now = new Date().toLocaleString('es-EC');
+    const activeFilters = [
+      filterAgency !== 'ALL' && `Agencia: ${agencies.find(a => a.id === filterAgency)?.name || filterAgency}`,
+      filterArea   !== 'ALL' && `Área: ${filterArea}`,
+      filterStatus !== 'ALL' && `Estado: ${filterStatus}`,
+      filterRisk   !== 'ALL' && `Riesgo: ${filterRisk}`,
+      search && `Búsqueda: "${search}"`,
+    ].filter(Boolean).join(' | ') || 'Sin filtros aplicados';
+
+    const rows = filtered.map(l => {
+      const fecha = l.timestamp ? new Date(l.timestamp).toLocaleDateString('es-EC') : '—';
+      const hora  = l.timestamp ? new Date(l.timestamp).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' }) : '—';
+      const statusColor = l.status === 'Autorizado' ? '#15803d' : '#dc2626';
+      const riskColor   = l.risk   === 'Alto' ? '#dc2626' : l.risk === 'Medio' ? '#d97706' : '#15803d';
+      return `
+        <tr>
+          <td style="font-family:monospace;font-size:10px;color:#64748b">${l.id}</td>
+          <td>${fecha}<br><span style="font-size:9px;color:#94a3b8">${hora}</span></td>
+          <td><strong>${l.name || 'Desconocido'}</strong><br><span style="font-size:9px;color:#94a3b8;font-family:monospace">${l.employeeId || 'N/A'}</span></td>
+          <td>${l.area || '—'}<br><span style="font-size:9px;color:#94a3b8">${l.device || '—'}</span></td>
+          <td style="text-align:center">${l.agency || '—'}</td>
+          <td style="text-align:center"><span style="color:${statusColor};font-weight:700;font-size:10px">${(l.status || '—').toUpperCase()}</span></td>
+          <td style="text-align:center"><span style="color:${riskColor};font-weight:700;font-size:10px">${l.risk || '—'}</span></td>
+        </tr>`;
+    }).join('');
+
+    const win = window.open('', '_blank', 'width=1100,height=750');
+    win.document.write(`<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Bitácora Kullki Wasi — ${now}</title>
+  <style>
+    @page { size: A4 landscape; margin: 1.5cm 1cm; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #1e293b; background:#fff; }
+    .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid #e2e8f0; }
+    .brand { display:flex; align-items:center; gap:10px; }
+    .brand-text .name { font-size:16px; font-weight:900; color:#1e293b; letter-spacing:.05em; }
+    .brand-text .sub  { font-size:9px;  color:#8DC63F; text-transform:uppercase; font-weight:700; letter-spacing:.1em; }
+    .meta { text-align:right; font-size:9px; color:#94a3b8; line-height:1.6; }
+    .meta strong { color:#475569; }
+    .filters { font-size:9px; color:#64748b; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:6px 10px; margin-bottom:14px; }
+    .filters strong { color:#334155; }
+    .summary { display:flex; gap:12px; margin-bottom:14px; }
+    .kpi { flex:1; border:1px solid #e2e8f0; border-radius:8px; padding:8px 12px; text-align:center; }
+    .kpi .num { font-size:20px; font-weight:900; }
+    .kpi .lbl { font-size:8px; text-transform:uppercase; letter-spacing:.06em; color:#94a3b8; font-weight:600; margin-top:2px; }
+    table { width:100%; border-collapse:collapse; }
+    thead tr { background:#1e293b; color:#fff; }
+    thead th { padding:8px 10px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; text-align:left; white-space:nowrap; }
+    tbody tr:nth-child(even) { background:#f8fafc; }
+    tbody tr:hover { background:#f1f5f9; }
+    tbody td { padding:7px 10px; font-size:10px; border-bottom:1px solid #e2e8f0; vertical-align:middle; }
+    .footer { margin-top:16px; padding-top:10px; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; font-size:8px; color:#94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">
+      <div class="brand-text">
+        <div class="name">KULLKI WASI</div>
+        <div class="sub">Cooperativa de Ahorro y Crédito</div>
+      </div>
+    </div>
+    <div class="meta">
+      <strong>Bitácora Institucional de Accesos</strong><br>
+      Generado: ${now}<br>
+      Registros mostrados: ${filtered.length} de ${logs.length}
+    </div>
+  </div>
+
+  <div class="filters"><strong>Filtros aplicados:</strong> ${activeFilters}</div>
+
+  <div class="summary">
+    <div class="kpi"><div class="num" style="color:#1e293b">${filtered.length}</div><div class="lbl">Total</div></div>
+    <div class="kpi"><div class="num" style="color:#15803d">${filtered.filter(l=>l.status==='Autorizado').length}</div><div class="lbl">Autorizados</div></div>
+    <div class="kpi"><div class="num" style="color:#dc2626">${filtered.filter(l=>l.status==='Denegado').length}</div><div class="lbl">Denegados</div></div>
+    <div class="kpi"><div class="num" style="color:#d97706">${filtered.filter(l=>l.risk==='Alto').length}</div><div class="lbl">Riesgo Alto</div></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th><th>Fecha / Hora</th><th>Colaborador</th>
+        <th>Área / Dispositivo</th><th>Agencia</th><th>Estado</th><th>Riesgo</th>
+      </tr>
+    </thead>
+    <tbody>${rows || '<tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8">Sin registros</td></tr>'}</tbody>
+  </table>
+
+  <div class="footer">
+    <span>Cooperativa Kullki Wasi Ltda. — Sistema de Control de Accesos y Trazabilidad</span>
+    <span>Documento generado automáticamente — ${now}</span>
+  </div>
+</body>
+</html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); win.close(); }, 400);
+  };
 
   const handleRefresh = async () => {
     await loadLogs();
@@ -103,8 +215,12 @@ const Logs = () => {
             <MdFileDownload size={16} className="text-[#79ac34]" />
             Exportar CSV
           </button>
-          <button onClick={() => window.print()} className="btn-danger text-white hover:text-white" style={{color: 'white'}}>
-            <MdPictureAsPdf size={16} />
+          <button
+            onClick={handlePrintPDF}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all cursor-pointer shadow-md shrink-0"
+            style={{ background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', boxShadow: '0 4px 14px rgba(239,68,68,0.35)' }}
+          >
+            <MdPictureAsPdf size={17} />
             Exportar PDF
           </button>
         </div>
@@ -124,18 +240,33 @@ const Logs = () => {
         ))}
       </div>
 
-      <div className="card-corporate p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+      <div className="card-corporate p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
         <div className="space-y-1">
           <label className="form-label flex items-center gap-1">
             <MdSearch size={14} /> Buscar
           </label>
-          <input type="text" placeholder="Nombre, ID o código..." value={search} onChange={e => setSearch(e.target.value)} className="w-full" />
+          <input
+            type="text"
+            placeholder="Nombre, ID, código o área..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full"
+          />
         </div>
         <div className="space-y-1">
           <label className="form-label">Agencia</label>
           <select value={filterAgency} onChange={e => setAgency(e.target.value)} className="w-full">
             <option value="ALL">Todas las Agencias</option>
             {agencies.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="form-label">Área</label>
+          <select value={filterArea} onChange={e => setArea(e.target.value)} className="w-full">
+            <option value="ALL">Todas las Áreas</option>
+            {allAreas.map(area => (
+              <option key={area} value={area}>{area}</option>
+            ))}
           </select>
         </div>
         <div className="space-y-1">
