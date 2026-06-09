@@ -10,6 +10,13 @@ import bcrypt
 import jwt
 import pyotp
 
+# Convierte un datetime naive (guardado en UTC) a string ISO 8601 con sufijo Z
+# para que JavaScript lo interprete correctamente como UTC y muestre la hora local del cliente
+def utc_iso(dt):
+    if dt is None:
+        return None
+    return dt.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+
 SECRET_KEY = "kullki-wasi-super-secret-jwt-key"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
@@ -429,7 +436,7 @@ def listar_logs(db: Session = Depends(get_db)):
         risk = "Alto" if l.resultado == "DENEGADO" else "Bajo"
         result.append({
             "id": f"LOG-{l.id_bitacora}",
-            "timestamp": l.fecha_hora.isoformat(),
+            "timestamp": utc_iso(l.fecha_hora),
             "employeeId": f"KW-{l.empleado.id_empleado:03d}" if l.empleado else "N/A",
             "name": emp_name,
             "role": emp_role,
@@ -460,11 +467,11 @@ def listar_alertas(db: Session = Depends(get_db)):
             "status": a.estado,
             "area": area_nombre,
             "agency": "Sistema",
-            "date": a.fecha_generacion.isoformat(),
+            "date": utc_iso(a.fecha_generacion),
             "details": motivo,
             "isResolved": a.estado == "RESUELTA",
             "resolvedBy": "",
-            "timestamp": a.fecha_generacion.isoformat(),
+            "timestamp": utc_iso(a.fecha_generacion),
         })
     return result
 
@@ -501,7 +508,7 @@ def listar_dispositivos(db: Session = Depends(get_db)):
             "agency": agency,
             "ip": d.ip_address or f"192.168.10.{20 + d.id_dispositivo}",
             "status": "Online" if d.estado else "Offline",
-            "lastPulse": d.ultima_sincronizacion.isoformat() if d.ultima_sincronizacion else None,
+            "lastPulse": utc_iso(d.ultima_sincronizacion),
             "mac": d.mac_address or "",
         })
     return result
