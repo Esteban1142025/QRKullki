@@ -1,85 +1,99 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { EMPLOYEES, ROLES, AGENCIES } from '../data/mockData';
+import { ROLES } from '../data/mockData';
+import apiClient from '../services/api/apiClient';
 import { QRCodeSVG } from 'qrcode.react';
 import Swal from 'sweetalert2';
 import {
   MdSearch, MdAdd, MdEdit, MdDelete, MdQrCode,
-  MdClose, MdSave, MdPrint, MdPeople, MdBadge
+  MdClose, MdSave, MdPrint, MdPeople, MdBadge, MdRefresh
 } from 'react-icons/md';
 
 const DEPARTMENTS = [
   'Tecnología e Información', 'Talento Humano', 'Gestión de Riesgos',
   'Seguridad y Vigilancia', 'Auditoría Interna', 'Operaciones Financieras',
-  'Caja y Servicios', 'Negocios y Microcrédito',
+  'Caja y Servicios', 'Negocios y Microcrédito', 'Administración General',
 ];
 
 const BLANK_FORM = {
-  id: '', dni: '', name: '', role: 'empleado', department: 'Caja y Servicios',
-  agency: 'MAT', email: '', phone: '', status: 'Activo',
-  photo: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-  hireDate: '',
+  id: '', id_empleado: null, dni: '', name: '', role: 'empleado',
+  department: 'Caja y Servicios', agency: 'MAT', email: '', phone: '',
+  status: 'Activo', hireDate: '',
 };
 
 const Employees = () => {
   const { user } = useAuth();
-  const [employees, setEmployees] = useState(() => {
-    try {
-      const raw = localStorage.getItem('kw_dynamic_employees');
-      return raw ? JSON.parse(raw) : EMPLOYEES;
-    } catch { return EMPLOYEES; }
-  });
+  const [employees, setEmployees] = useState([]);
+  const [agencies, setAgencies] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [search, setSearch]           = useState('');
-  const [filterAgency, setFilterAgency]   = useState('ALL');
-  const [filterDept, setFilterDept]     = useState('ALL');
-  const [filterStatus, setFilterStatus]   = useState('ALL');
-  const [showForm, setShowForm]         = useState(false);
+  const [search, setSearch]         = useState('');
+  const [filterAgency, setFilterAgency] = useState('ALL');
+  const [filterDept, setFilterDept]   = useState('ALL');
+  const [filterStatus, setFilterStatus] = useState('ALL');
+  const [showForm, setShowForm]       = useState(false);
   const [showQR, setShowQR]           = useState(false);
-  const [editing, setEditing]           = useState(null);   // employee being edited
-  const [qrEmployee, setQrEmployee]     = useState(null);
+  const [editing, setEditing]         = useState(null);
+  const [qrEmployee, setQrEmployee]   = useState(null);
   const [form, setForm]               = useState(BLANK_FORM);
-
-  // ── helpers ──────────────────────────────────────
-  const persist = (list) => {
-    setEmployees(list);
-    localStorage.setItem('kw_dynamic_employees', JSON.stringify(list));
-  };
-
-  const auditLog = (details, risk = 'Bajo') => {
-    const log = {
-      id: `LOG-${Date.now()}`, timestamp: new Date().toISOString(),
-      employeeId: user?.id, name: user?.name, role: user?.role,
-      agency: user?.agency, area: 'Módulo Personal', device: 'Navegador',
-      status: 'Autorizado', details, risk,
-    };
-    const existing = JSON.parse(localStorage.getItem('kw_dynamic_logs') || '[]');
-    localStorage.setItem('kw_dynamic_logs', JSON.stringify([log, ...existing]));
-  };
 
   const fireSwal = (opts) => Swal.fire({ background: '#0d1424', color: '#f1f5f9', ...opts });
 
-  // ── filters ──────────────────────────────────────
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [empRes, agRes, rolRes] = await Promise.all([
+        apiClient.get('/empleados'),
+        apiClient.get('/agencias'),
+        apiClient.get('/roles'),
+      ]);
+      setEmployees(empRes.data);
+      setAgencies(agRes.data);
+      setRoles(rolRes.data);
+    } catch (err) {
+      console.error('Error al cargar datos:', err);
+      fireSwal({ icon: 'error', title: 'Error de conexión', text: 'No se pudo cargar la información desde el servidor.' });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
   const filtered = employees.filter(e => {
     const q = search.toLowerCase();
-    const matchQ = e.name.toLowerCase().includes(q) || e.dni.includes(q) || e.id.toLowerCase().includes(q);
+    const matchQ = (e.name || '').toLowerCase().includes(q) ||
+                   (e.dni || '').includes(q) ||
+                   (e.id || '').toLowerCase().includes(q);
     return matchQ
       && (filterAgency === 'ALL' || e.agency === filterAgency)
       && (filterDept   === 'ALL' || e.department === filterDept)
       && (filterStatus === 'ALL' || e.status === filterStatus);
   });
 
-  const departments = [...new Set(employees.map(e => e.department))];
+  const departments = [...new Set(employees.map(e => e.department).filter(Boolean))];
 
-  // ── CRUD ─────────────────────────────────────────
   const openAdd = () => {
-    setForm({ ...BLANK_FORM, id: `KW-0${String(employees.length + 1).padStart(2, '0')}`, hireDate: new Date().toISOString().split('T')[0] });
+    setForm({ ...BLANK_FORM, hireDate: new Date().toISOString().split('T')[0] });
     setEditing(null);
     setShowForm(true);
   };
 
   const openEdit = (emp) => {
-    setForm({ ...emp });
+    setForm({
+      id: emp.id,
+      id_empleado: emp.id_empleado,
+      dni: emp.dni,
+      name: emp.name,
+      role: emp.role,
+      department: emp.department || 'Caja y Servicios',
+      agency: emp.agency || 'MAT',
+      email: emp.email || '',
+      phone: emp.phone || '',
+      status: emp.status,
+      hireDate: emp.hireDate || '',
+    });
     setEditing(emp);
     setShowForm(true);
   };
@@ -91,68 +105,98 @@ const Employees = () => {
       icon: 'warning', showCancelButton: true,
       confirmButtonColor: '#ef4444', cancelButtonColor: '#334155',
       confirmButtonText: 'Sí, eliminar', cancelButtonText: 'Cancelar',
-    }).then(res => {
+    }).then(async res => {
       if (res.isConfirmed) {
-        persist(employees.filter(e => e.id !== emp.id));
-        auditLog(`Baja del colaborador ${emp.name} (${emp.id}).`, 'Medio');
-        fireSwal({ icon: 'success', title: 'Registro eliminado', timer: 1400, showConfirmButton: false });
+        try {
+          await apiClient.delete(`/empleados/${emp.id_empleado}`);
+          await fetchData();
+          fireSwal({ icon: 'success', title: 'Registro eliminado', timer: 1400, showConfirmButton: false });
+        } catch (err) {
+          fireSwal({ icon: 'error', title: 'Error', text: err.response?.data?.detail || 'No se pudo eliminar el colaborador.' });
+        }
       }
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.dni || !form.name || !form.email) {
       fireSwal({ icon: 'error', title: 'Campos requeridos', text: 'Cédula, Nombre y Correo son obligatorios.' });
       return;
     }
 
-    // Verificar duplicados (excluyendo al empleado actual si se está editando)
-    const duplicate = employees.find(emp => 
-      emp.id !== form.id && (emp.dni === form.dni || emp.email.toLowerCase() === form.email.toLowerCase())
-    );
-    if (duplicate) {
-      fireSwal({ icon: 'error', title: 'Datos Duplicados', text: 'Ya existe otro colaborador con esta Cédula o Correo.' });
-      return;
+    const parts = form.name.trim().split(' ');
+    const nombres = parts[0];
+    const apellidos = parts.slice(1).join(' ') || parts[0];
+
+    const agencyObj = agencies.find(a => a.id === form.agency);
+    const id_agencia_base = agencyObj ? agencyObj.id_agencia : 1;
+
+    const roleObj = roles.find(r => r.name === form.role);
+    const role_ids = roleObj ? [roleObj.id] : [];
+
+    const payload = {
+      identificacion: form.dni,
+      nombres,
+      apellidos,
+      email: form.email,
+      id_agencia_base,
+      departamento: form.department,
+      estado_laboral: form.status === 'Activo' ? 'ACTIVO' : 'INACTIVO',
+      role_ids,
+    };
+
+    try {
+      if (editing) {
+        await apiClient.put(`/empleados/${editing.id_empleado}`, payload);
+      } else {
+        await apiClient.post('/empleados', payload);
+      }
+      await fetchData();
+      setShowForm(false);
+      fireSwal({
+        icon: 'success',
+        title: editing ? 'Actualizado' : 'Guardado',
+        text: `Expediente de ${form.name} registrado.`,
+        timer: 1600, showConfirmButton: false
+      });
+    } catch (err) {
+      fireSwal({ icon: 'error', title: 'Error', text: err.response?.data?.detail || 'Error al guardar el expediente.' });
     }
-
-    // Generar o actualizar QR Code
-    const idSufix = form.id.includes('-') ? form.id.split('-')[1] : form.id;
-    const qrCode = `KULLKIWASI-${form.role.toUpperCase()}-${form.dni}-${idSufix}`;
-    const formWithQR = { ...form, qrCode };
-
-    let updated;
-    if (editing) {
-      updated = employees.map(e => e.id === form.id ? formWithQR : e);
-      auditLog(`Edición de expediente de ${form.name} (${form.id}).`);
-    } else {
-      updated = [formWithQR, ...employees];
-      auditLog(`Alta de nuevo colaborador ${form.name} (${form.id}).`, 'Medio');
-    }
-
-    persist(updated);
-    setShowForm(false);
-    fireSwal({ icon: 'success', title: editing ? 'Actualizado' : 'Guardado', text: `Expediente de ${form.name} registrado.`, timer: 1600, showConfirmButton: false });
   };
 
   const field = (key, val) => setForm(f => ({ ...f, [key]: val }));
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 border-4 border-[#8DC63F] border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-slate-500 text-sm font-medium">Cargando colaboradores...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
 
-      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-black text-slate-800 font-['Outfit']">Expedientes de Colaboradores</h2>
           <p className="text-xs text-slate-500 mt-0.5">Administre el personal, cargos, departamentos y credenciales QR de acceso.</p>
         </div>
-        <button onClick={openAdd} className="btn-primary shrink-0">
-          <MdAdd size={16} />
-          AGREGAR COLABORADOR
-        </button>
+        <div className="flex gap-2">
+          <button onClick={fetchData} className="btn-icon" title="Actualizar">
+            <MdRefresh size={18} />
+          </button>
+          <button onClick={openAdd} className="btn-primary shrink-0">
+            <MdAdd size={16} />
+            AGREGAR COLABORADOR
+          </button>
+        </div>
       </div>
 
-      {/* Stats strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           ['Total', employees.length, 'text-slate-800'],
@@ -170,19 +214,16 @@ const Employees = () => {
         ))}
       </div>
 
-      {/* Filters */}
       <div className="card-corporate p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
         <div className="lg:col-span-2 space-y-1">
           <label className="form-label">Buscar</label>
-          <div className="relative">
-            <input type="text" placeholder="Nombre, cédula o ID..." value={search} onChange={e => setSearch(e.target.value)} className="w-full" />
-          </div>
+          <input type="text" placeholder="Nombre, cédula o ID..." value={search} onChange={e => setSearch(e.target.value)} className="w-full" />
         </div>
         <div className="space-y-1">
           <label className="form-label">Agencia</label>
           <select value={filterAgency} onChange={e => setFilterAgency(e.target.value)} className="w-full">
             <option value="ALL">Todas</option>
-            {AGENCIES.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            {agencies.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         </div>
         <div className="space-y-1">
@@ -202,16 +243,13 @@ const Employees = () => {
         </div>
       </div>
 
-      {/* Table */}
       <div className="card-corporate overflow-hidden">
         <div className="overflow-x-auto">
           <table className="data-table">
             <thead>
               <tr>
                 {['Colaborador', 'Cédula / ID', 'Cargo', 'Sucursal', 'Estado', 'QR', 'Acciones'].map(h => (
-                  <th key={h} className={h === 'QR' || h === 'Acciones' ? 'text-center' : ''}>
-                    {h}
-                  </th>
+                  <th key={h} className={h === 'QR' || h === 'Acciones' ? 'text-center' : ''}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -242,12 +280,10 @@ const Employees = () => {
                       </span>
                     </td>
                     <td className="text-slate-600">
-                      {emp.agency === 'MAT' ? 'Matriz' : emp.agency}
+                      {emp.agency === 'MAT' ? 'Matriz' : emp.agencyName || emp.agency}
                     </td>
                     <td>
-                      <span className={`badge ${
-                        emp.status === 'Activo' ? 'badge-active' : 'badge-inactive'
-                      }`}>
+                      <span className={`badge ${emp.status === 'Activo' ? 'badge-active' : 'badge-inactive'}`}>
                         {emp.status}
                       </span>
                     </td>
@@ -284,7 +320,7 @@ const Employees = () => {
         </div>
       </div>
 
-      {/* ── MODAL: FORM ─────────────────────────────── */}
+      {/* MODAL: FORM */}
       {showForm && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="w-full max-w-xl bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xl my-4">
@@ -309,11 +345,13 @@ const Employees = () => {
                     <input type={type} placeholder={ph} value={form[key]} onChange={e => field(key, e.target.value)} className="form-input" />
                   </div>
                 ))}
-
                 <div className="space-y-1">
                   <label className="form-label">Rol de Sistema</label>
                   <select value={form.role} onChange={e => field('role', e.target.value)} className="form-input">
-                    {Object.entries(ROLES).map(([id, r]) => <option key={id} value={id}>{r.name}</option>)}
+                    {roles.length > 0
+                      ? roles.map(r => <option key={r.id} value={r.name}>{ROLES[r.name]?.name || r.name}</option>)
+                      : Object.entries(ROLES).map(([id, r]) => <option key={id} value={id}>{r.name}</option>)
+                    }
                   </select>
                 </div>
                 <div className="space-y-1">
@@ -325,7 +363,7 @@ const Employees = () => {
                 <div className="space-y-1">
                   <label className="form-label">Agencia Asignada</label>
                   <select value={form.agency} onChange={e => field('agency', e.target.value)} className="form-input">
-                    {AGENCIES.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    {agencies.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">
@@ -336,11 +374,8 @@ const Employees = () => {
                   </select>
                 </div>
               </div>
-
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-2">
-                <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">
-                  Cancelar
-                </button>
+                <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">Cancelar</button>
                 <button type="submit" className="btn-primary">
                   <MdSave size={16} /> Guardar Expediente
                 </button>
@@ -350,7 +385,7 @@ const Employees = () => {
         </div>
       )}
 
-      {/* ── MODAL: QR CREDENTIAL ────────────────────── */}
+      {/* MODAL: QR CREDENTIAL */}
       {showQR && qrEmployee && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="w-full max-w-sm bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xl">
@@ -363,11 +398,8 @@ const Employees = () => {
                 <MdClose size={18} />
               </button>
             </div>
-
             <div className="p-6 flex flex-col items-center gap-5">
-              {/* ID card */}
               <div className="print-area w-full p-5 rounded-2xl bg-white border border-slate-200 flex flex-col items-center gap-4 shadow-sm relative overflow-hidden">
-                {/* Brand header */}
                 <div className="flex items-center gap-2 w-full">
                   <img src="https://play-lh.googleusercontent.com/G-uc06_SBqaE8a-M7JKQCD-Hpfkvxb1g9X3VPmyngldtTRS-pr69QPW_4zDBe9_6qEw" alt="Logo" className="w-7 h-7 rounded-lg shadow-sm object-cover border border-slate-100" />
                   <div>
@@ -375,12 +407,9 @@ const Employees = () => {
                     <p className="text-[8px] text-slate-500 uppercase">Credencial de Acceso</p>
                   </div>
                 </div>
-
-                {/* QR code */}
                 <div className="p-3 bg-white rounded-xl shadow-md border border-slate-100">
                   <QRCodeSVG value={qrEmployee.qrCode ?? 'KW-NO-QR'} size={150} fgColor="#1e293b" level="H" />
                 </div>
-
                 <div className="text-center">
                   <p className="font-bold text-slate-800 text-sm">{qrEmployee.name}</p>
                   <p className="text-[11px] text-slate-500 mt-0.5">{qrEmployee.department}</p>
@@ -388,28 +417,20 @@ const Employees = () => {
                     {qrEmployee.id}
                   </span>
                 </div>
-
                 <div className="w-full text-center space-y-1">
                   <div className="flex justify-between items-center text-[8px] uppercase tracking-wider text-slate-500">
                     <span>Emisión:</span>
-                    <span className="font-bold text-slate-700">{new Date(qrEmployee.hireDate || Date.now()).toLocaleDateString('es-EC')}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-[8px] uppercase tracking-wider text-slate-500">
-                    <span>Expira:</span>
-                    <span className="font-bold text-slate-700">{new Date(new Date(qrEmployee.hireDate || Date.now()).setFullYear(new Date(qrEmployee.hireDate || Date.now()).getFullYear() + 1)).toLocaleDateString('es-EC')}</span>
+                    <span className="font-bold text-slate-700">{qrEmployee.hireDate ? new Date(qrEmployee.hireDate).toLocaleDateString('es-EC') : 'N/A'}</span>
                   </div>
                   <div className="flex justify-between items-center text-[8px] uppercase tracking-wider text-slate-500">
                     <span>Estado:</span>
                     <span className={`font-bold ${qrEmployee.status === 'Activo' ? 'text-[#8DC63F]' : 'text-red-500'}`}>{qrEmployee.status}</span>
                   </div>
                 </div>
-
                 <div className="w-full pt-3 border-t border-slate-100 text-center">
                   <p className="text-[8px] text-slate-400 font-mono break-all">{qrEmployee.qrCode}</p>
                 </div>
               </div>
-
-              {/* Actions */}
               <button onClick={() => window.print()} className="btn-secondary w-full justify-center">
                 <MdPrint size={16} className="text-[#8DC63F]" />
                 Imprimir Credencial
@@ -418,7 +439,6 @@ const Employees = () => {
           </div>
         </div>
       )}
-
     </div>
   );
 };

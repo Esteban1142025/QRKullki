@@ -1,34 +1,31 @@
-import React, { useState } from 'react';
-import { AGENCIES } from '../data/mockData';
+import React, { useState, useEffect, useCallback } from 'react';
+import apiClient from '../services/api/apiClient';
 import Swal from 'sweetalert2';
-import { MdStore, MdLocationOn, MdPhone, MdAdd, MdEdit, MdDelete, MdClose, MdSave } from 'react-icons/md';
+import { MdStore, MdLocationOn, MdPhone, MdAdd, MdEdit, MdDelete, MdClose, MdSave, MdRefresh } from 'react-icons/md';
 
 const Agencies = () => {
-  const [agencies, setAgencies] = useState(() => {
-    try {
-      const stored = localStorage.getItem('kw_dynamic_agencies');
-      return stored ? JSON.parse(stored) : AGENCIES;
-    } catch { return AGENCIES; }
-  });
-
+  const [agencies, setAgencies] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ id: '', name: '', address: '', phone: '', type: 'Sucursal', status: 'Activo' });
-  const [alerts, setAlerts] = useState([]);
+  const [form, setForm] = useState({ id: '', id_agencia: null, name: '', address: '', phone: '', type: 'Sucursal', status: 'Activo' });
 
-  React.useEffect(() => {
+  const fetchAgencies = useCallback(async () => {
+    setLoading(true);
     try {
-      setAlerts(JSON.parse(localStorage.getItem('kw_dynamic_alerts') || '[]').filter(a => !a.isResolved));
-    } catch(e){}
+      const res = await apiClient.get('/agencias');
+      setAgencies(res.data);
+    } catch (err) {
+      console.error('Error al cargar agencias:', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const persist = (list) => {
-    setAgencies(list);
-    localStorage.setItem('kw_dynamic_agencies', JSON.stringify(list));
-  };
+  useEffect(() => { fetchAgencies(); }, [fetchAgencies]);
 
   const openAdd = () => {
-    setForm({ id: '', name: '', address: '', phone: '', type: 'Sucursal', status: 'Activo' });
+    setForm({ id: '', id_agencia: null, name: '', address: '', phone: '', type: 'Sucursal', status: 'Activo' });
     setEditing(null);
     setShowForm(true);
   };
@@ -39,7 +36,7 @@ const Agencies = () => {
     setShowForm(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = (agency) => {
     Swal.fire({
       title: '¿Eliminar Sucursal?',
       text: 'Esta acción no se puede deshacer.',
@@ -51,39 +48,59 @@ const Agencies = () => {
       cancelButtonText: 'Cancelar',
       background: '#ffffff',
       color: '#1e293b'
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
-        persist(agencies.filter(a => a.id !== id));
-        Swal.fire({ icon: 'success', title: 'Agencia Eliminada', timer: 1500, showConfirmButton: false });
+        try {
+          await apiClient.delete(`/agencias/${agency.id_agencia}`);
+          await fetchAgencies();
+          Swal.fire({ icon: 'success', title: 'Agencia Eliminada', timer: 1500, showConfirmButton: false });
+        } catch (err) {
+          Swal.fire({ icon: 'error', title: 'Error', text: err.response?.data?.detail || 'No se pudo eliminar la agencia.' });
+        }
       }
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.id || !form.name) {
-      Swal.fire({ icon: 'error', title: 'Campos requeridos', text: 'El ID y el Nombre son obligatorios.' });
+      Swal.fire({ icon: 'error', title: 'Campos requeridos', text: 'El Código y el Nombre son obligatorios.' });
       return;
     }
 
-    // Prevención de duplicados
-    const isDuplicate = agencies.some(a => (a.id === form.id || a.name.toLowerCase() === form.name.toLowerCase()) && a.id !== editing?.id);
-    if (isDuplicate) {
-      Swal.fire({ icon: 'error', title: 'Agencia Duplicada', text: 'Ya existe una agencia con este ID o Nombre.' });
-      return;
-    }
+    const payload = {
+      nombre: form.name,
+      codigo: form.id.toUpperCase(),
+      direccion: form.address,
+      telefono: form.phone,
+      tipo: form.type,
+      estado: form.status === 'Activo',
+    };
 
-    let updated;
-    if (editing) {
-      updated = agencies.map(a => a.id === editing.id ? form : a);
-    } else {
-      updated = [...agencies, form];
+    try {
+      if (editing) {
+        await apiClient.put(`/agencias/${editing.id_agencia}`, payload);
+      } else {
+        await apiClient.post('/agencias', payload);
+      }
+      await fetchAgencies();
+      setShowForm(false);
+      Swal.fire({ icon: 'success', title: 'Agencia Guardada', timer: 1500, showConfirmButton: false });
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.response?.data?.detail || 'Error al guardar la agencia.' });
     }
-    
-    persist(updated);
-    setShowForm(false);
-    Swal.fire({ icon: 'success', title: 'Agencia Guardada', timer: 1500, showConfirmButton: false });
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 border-4 border-[#8DC63F] border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-slate-500 text-sm font-medium">Cargando agencias...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -93,44 +110,30 @@ const Agencies = () => {
           <h2 className="text-2xl font-black text-slate-800 font-['Outfit']">Red de Sucursales</h2>
           <p className="text-sm text-slate-500 mt-1">Gestione las agencias físicas y puntos de extensión de la cooperativa.</p>
         </div>
-        <button onClick={openAdd} className="btn-primary shrink-0">
-          <MdAdd size={18} />
-          NUEVA AGENCIA
-        </button>
+        <div className="flex gap-2">
+          <button onClick={fetchAgencies} className="btn-icon" title="Actualizar">
+            <MdRefresh size={18} />
+          </button>
+          <button onClick={openAdd} className="btn-primary shrink-0">
+            <MdAdd size={18} />
+            NUEVA AGENCIA
+          </button>
+        </div>
       </div>
 
-      {/* Mapa Operativo - Semáforo */}
+      {/* Mapa Operativo */}
       <div className="bg-slate-900 rounded-2xl p-6 shadow-xl border border-slate-800 text-white relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-[#84cc16]/5 rounded-full blur-3xl pointer-events-none"></div>
         <div className="flex items-center gap-2 mb-6">
           <MdLocationOn size={20} className="text-[#84cc16]" />
           <h3 className="font-bold font-['Outfit'] tracking-wider uppercase text-sm">Mapa Operativo en Tiempo Real</h3>
         </div>
-        
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 relative z-10">
           {agencies.map(agency => {
-            const agencyAlerts = alerts.filter(a => a.agency === agency.name || a.agency === agency.id);
-            let statusColor = 'bg-emerald-500 shadow-emerald-500/40 text-emerald-950'; // Normal
-            let pingColor = 'bg-emerald-400';
-            let statusText = 'Normal';
-
-            if (agency.status !== 'Activo') {
-              statusColor = 'bg-slate-600 shadow-slate-600/40 text-slate-100'; // Offline
-              pingColor = 'bg-slate-500';
-              statusText = 'Desconectado';
-            } else if (agencyAlerts.length > 0) {
-              const hasCritical = agencyAlerts.some(a => a.severity === 'Crítica');
-              if (hasCritical) {
-                statusColor = 'bg-red-500 shadow-red-500/40 text-white'; // Crítico
-                pingColor = 'bg-red-400';
-                statusText = 'Crítico';
-              } else {
-                statusColor = 'bg-amber-400 shadow-amber-400/40 text-amber-950'; // Advertencia
-                pingColor = 'bg-amber-300';
-                statusText = 'Alerta';
-              }
-            }
-
+            const active = agency.status === 'Activo';
+            const statusColor = active ? 'bg-emerald-500 shadow-emerald-500/40 text-emerald-950' : 'bg-slate-600 shadow-slate-600/40 text-slate-100';
+            const pingColor = active ? 'bg-emerald-400' : 'bg-slate-500';
+            const statusText = active ? 'Normal' : 'Desconectado';
             return (
               <div key={agency.id} className={`${statusColor} rounded-xl p-3 shadow-lg flex flex-col justify-between aspect-video transition-all`}>
                 <div className="flex justify-between items-start">
@@ -153,7 +156,6 @@ const Agencies = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {agencies.map(agency => (
           <div key={agency.id} className="card-corporate p-6 flex flex-col justify-between h-full group hover:-translate-y-1 transition-transform duration-300">
-            
             <div className="mb-4">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -166,19 +168,21 @@ const Agencies = () => {
                   </div>
                 </div>
               </div>
-
               <div className="space-y-3 mt-5 text-sm">
-                <div className="flex items-start gap-2 text-slate-500">
-                  <MdLocationOn size={18} className="shrink-0 mt-0.5 text-slate-400" />
-                  <span className="leading-relaxed font-medium">{agency.address}</span>
-                </div>
-                <div className="flex items-center gap-2 text-slate-500">
-                  <MdPhone size={18} className="shrink-0 text-slate-400" />
-                  <span className="font-mono font-bold">{agency.phone}</span>
-                </div>
+                {agency.address && (
+                  <div className="flex items-start gap-2 text-slate-500">
+                    <MdLocationOn size={18} className="shrink-0 mt-0.5 text-slate-400" />
+                    <span className="leading-relaxed font-medium">{agency.address}</span>
+                  </div>
+                )}
+                {agency.phone && (
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <MdPhone size={18} className="shrink-0 text-slate-400" />
+                    <span className="font-mono font-bold">{agency.phone}</span>
+                  </div>
+                )}
               </div>
             </div>
-
             <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-auto">
               <div className="flex items-center gap-2">
                 <span className="relative flex h-3 w-3">
@@ -187,17 +191,15 @@ const Agencies = () => {
                 </span>
                 <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">{agency.status}</span>
               </div>
-              
               <div className="flex gap-2">
                 <button onClick={() => openEdit(agency)} className="btn-icon">
                   <MdEdit size={16} />
                 </button>
-                <button onClick={() => handleDelete(agency.id)} className="btn-icon text-red-500 hover:bg-red-50 hover:text-red-600 border-transparent">
+                <button onClick={() => handleDelete(agency)} className="btn-icon text-red-500 hover:bg-red-50 hover:text-red-600 border-transparent">
                   <MdDelete size={16} />
                 </button>
               </div>
             </div>
-            
           </div>
         ))}
       </div>
@@ -256,7 +258,6 @@ const Agencies = () => {
           </div>
         </div>
       )}
-
     </div>
   );
 };

@@ -1,78 +1,77 @@
-import React, { useState, useEffect } from 'react';
-import { AREAS } from '../data/mockData';
-import { MdMap, MdVpnKey, MdAccessTime, MdEdit, MdHistory, MdClose, MdSave } from 'react-icons/md';
+import React, { useState, useEffect, useCallback } from 'react';
+import apiClient from '../services/api/apiClient';
+import { MdMap, MdVpnKey, MdAccessTime, MdEdit, MdHistory, MdClose, MdSave, MdRefresh } from 'react-icons/md';
 import Swal from 'sweetalert2';
 import { useAuth } from '../context/AuthContext';
 
 const RestrictedAreas = () => {
   const { user } = useAuth();
-  
-  const [areas, setAreas] = useState(() => {
-    try {
-      const stored = localStorage.getItem('kw_dynamic_areas');
-      return stored ? JSON.parse(stored) : AREAS;
-    } catch { return AREAS; }
-  });
-
+  const [areas, setAreas] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [history, setHistory] = useState(() => {
-    try {
-      const stored = localStorage.getItem('kw_dynamic_area_logs');
-      return stored ? JSON.parse(stored) : [];
-    } catch { return []; }
+    try { return JSON.parse(localStorage.getItem('kw_area_history') || '[]'); } catch { return []; }
   });
-
   const [editingArea, setEditingArea] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
-  const [form, setForm] = useState({ schedule: '', allowedRoles: '', riskLevel: '' });
+  const [form, setForm] = useState({ schedule: '', riskLevel: '' });
 
-  const persistAreas = (newAreas) => {
-    setAreas(newAreas);
-    localStorage.setItem('kw_dynamic_areas', JSON.stringify(newAreas));
-  };
+  const fetchAreas = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiClient.get('/areas');
+      setAreas(res.data);
+    } catch (err) {
+      console.error('Error al cargar áreas:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const persistHistory = (newHistory) => {
-    setHistory(newHistory);
-    localStorage.setItem('kw_dynamic_area_logs', JSON.stringify(newHistory));
-  };
+  useEffect(() => { fetchAreas(); }, [fetchAreas]);
 
   const handleEdit = (area) => {
     setEditingArea(area);
-    setForm({
-      schedule: area.schedule,
-      allowedRoles: area.allowedRoles.join(', '),
-      riskLevel: area.riskLevel
-    });
+    setForm({ schedule: area.schedule, riskLevel: area.riskLevel });
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-    const updatedAreas = areas.map(a => {
-      if (a.id === editingArea.id) {
-        return {
-          ...a,
-          schedule: form.schedule,
-          allowedRoles: form.allowedRoles.split(',').map(r => r.trim()).filter(Boolean),
-          riskLevel: form.riskLevel
-        };
-      }
-      return a;
-    });
+    try {
+      await apiClient.put(`/areas/${editingArea.id_area}`, {
+        nivel_riesgo: form.riskLevel,
+        horario: form.schedule,
+      });
 
-    const changeLog = {
-      id: Date.now(),
-      areaId: editingArea.id,
-      areaName: editingArea.name,
-      timestamp: new Date().toISOString(),
-      user: user?.name || 'Sistema',
-      changes: `Actualizado: Riesgo(${form.riskLevel}), Horario(${form.schedule}), Roles(${form.allowedRoles})`
-    };
+      const changeLog = {
+        id: Date.now(),
+        areaId: editingArea.id,
+        areaName: editingArea.name,
+        timestamp: new Date().toISOString(),
+        user: user?.name || 'Sistema',
+        changes: `Actualizado: Riesgo(${form.riskLevel}), Horario(${form.schedule})`
+      };
+      const newHistory = [changeLog, ...history];
+      setHistory(newHistory);
+      localStorage.setItem('kw_area_history', JSON.stringify(newHistory));
 
-    persistAreas(updatedAreas);
-    persistHistory([changeLog, ...history]);
-    
-    setEditingArea(null);
-    Swal.fire({ icon: 'success', title: 'Área Actualizada', timer: 1500, showConfirmButton: false });
+      await fetchAreas();
+      setEditingArea(null);
+      Swal.fire({ icon: 'success', title: 'Área Actualizada', timer: 1500, showConfirmButton: false });
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.response?.data?.detail || 'Error al actualizar el área.' });
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 border-4 border-[#8DC63F] border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-slate-500 text-sm font-medium">Cargando áreas restringidas...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -82,22 +81,25 @@ const RestrictedAreas = () => {
           <h2 className="text-2xl font-black text-slate-800 font-['Outfit']">Zonas de Acceso Controlado</h2>
           <p className="text-sm text-slate-500 mt-1">Gestión de áreas físicas, perfiles autorizados y políticas de horario de la cooperativa.</p>
         </div>
-        <button onClick={() => setShowHistory(true)} className="flex items-center gap-2 px-5 py-3 bg-slate-800 hover:bg-slate-900 rounded-xl text-sm font-bold text-white tracking-wider transition-all shadow-lg shrink-0">
-          <MdHistory size={18} className="text-[#84cc16]" />
-          HISTORIAL
-        </button>
+        <div className="flex gap-2">
+          <button onClick={fetchAreas} className="btn-icon" title="Actualizar">
+            <MdRefresh size={18} />
+          </button>
+          <button onClick={() => setShowHistory(true)} className="flex items-center gap-2 px-5 py-3 bg-slate-800 hover:bg-slate-900 rounded-xl text-sm font-bold text-white tracking-wider transition-all shadow-lg shrink-0">
+            <MdHistory size={18} className="text-[#84cc16]" />
+            HISTORIAL
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {areas.map(area => (
           <div key={area.id} className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-lg transition-all flex flex-col h-full relative overflow-hidden group">
-            
             <div className={`absolute top-0 right-0 w-36 h-36 rounded-full blur-3xl pointer-events-none ${
               area.riskLevel === 'Crítico' ? 'bg-red-500/10' :
               area.riskLevel === 'Alto' ? 'bg-orange-500/10' :
               'bg-[#84cc16]/10'
             }`} />
-
             <div className="relative z-10 flex-1 flex flex-col">
               <div className="flex items-start justify-between mb-5">
                 <div className="flex items-center gap-4">
@@ -116,7 +118,6 @@ const RestrictedAreas = () => {
                   </div>
                 </div>
               </div>
-
               <div className="space-y-4 mb-6 mt-5 text-sm font-medium flex-1">
                 <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                   <span className="text-slate-600 flex items-center gap-2"><MdVpnKey size={16} /> Nivel Riesgo</span>
@@ -125,33 +126,25 @@ const RestrictedAreas = () => {
                     area.riskLevel === 'Alto' ? 'text-orange-500' : 'text-[#65a30d]'
                   }`}>{area.riskLevel}</span>
                 </div>
-                
                 <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                   <span className="text-slate-600 flex items-center gap-2"><MdAccessTime size={16} /> Horario</span>
                   <span className="font-mono text-[#84cc16] font-bold text-sm">{area.schedule}</span>
                 </div>
+                <div className="flex justify-between items-center pb-1">
+                  <span className="text-slate-600 text-xs font-bold uppercase tracking-wider">Estado</span>
+                  <span className={`text-xs font-black uppercase ${area.status === 'Protegido' ? 'text-emerald-600' : 'text-red-500'}`}>
+                    {area.status}
+                  </span>
+                </div>
               </div>
-
               <div className="pt-2">
-                <p className="text-xs font-black text-slate-500 uppercase tracking-wider mb-3 flex justify-between items-center">
-                  Roles Autorizados
-                  <button onClick={() => handleEdit(area)} className="text-slate-400 hover:text-[#84cc16] transition-colors bg-white border border-slate-200 rounded p-1">
-                    <MdEdit size={14} />
+                <div className="flex justify-end">
+                  <button onClick={() => handleEdit(area)} className="text-slate-400 hover:text-[#84cc16] transition-colors bg-white border border-slate-200 rounded p-1.5 flex items-center gap-1.5 text-xs font-bold">
+                    <MdEdit size={14} /> Editar
                   </button>
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {area.allowedRoles.map(r => (
-                    <span key={r} className={`px-2.5 py-1 rounded text-[10px] font-black uppercase border shadow-sm ${
-                      r === 'all' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
-                      'bg-slate-800 text-white border-slate-900'
-                    }`}>
-                      {r === 'all' ? 'Acceso Público / Todos' : r.replace('_', ' ')}
-                    </span>
-                  ))}
                 </div>
               </div>
             </div>
-            
           </div>
         ))}
       </div>
@@ -172,6 +165,7 @@ const RestrictedAreas = () => {
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Nivel de Riesgo</label>
                 <select value={form.riskLevel} onChange={e => setForm({...form, riskLevel: e.target.value})} className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-800">
+                  <option value="Bajo">Bajo</option>
                   <option value="Medio">Medio</option>
                   <option value="Alto">Alto</option>
                   <option value="Crítico">Crítico</option>
@@ -180,10 +174,6 @@ const RestrictedAreas = () => {
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Horario Permitido</label>
                 <input type="text" value={form.schedule} onChange={e => setForm({...form, schedule: e.target.value})} placeholder="Ej: 08:00 - 18:00 o 24/7" className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-800" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Roles Permitidos (separados por coma)</label>
-                <input type="text" value={form.allowedRoles} onChange={e => setForm({...form, allowedRoles: e.target.value})} placeholder="Ej: admin, gerente, cajero" className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-800" />
               </div>
               <div className="flex justify-end pt-4 mt-2">
                 <button type="submit" className="flex items-center gap-2 px-5 py-2.5 bg-[#84cc16] hover:bg-[#65a30d] rounded-xl text-sm font-bold text-white shadow-md transition-all">
@@ -229,7 +219,6 @@ const RestrictedAreas = () => {
           </div>
         </div>
       )}
-
     </div>
   );
 };

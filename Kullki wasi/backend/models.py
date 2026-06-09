@@ -21,7 +21,10 @@ class Agencia(Base):
 
     id_agencia = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
     nombre = Column(String(100), nullable=False)
+    codigo = Column(String(10), nullable=True)
     direccion = Column(Text, nullable=True)
+    telefono = Column(String(20), nullable=True)
+    tipo = Column(String(30), default='Sucursal')
     estado = Column(Boolean, default=True)
 
 class Permiso(Base):
@@ -53,6 +56,7 @@ class Empleado(Base):
     password_hash = Column(String(255), nullable=True)
     totp_secret = Column(String(255), nullable=True)
     estado_laboral = Column(String(20), default='ACTIVO')
+    departamento = Column(String(100), nullable=True)
     creado_en = Column(DateTime, default=datetime.datetime.utcnow)
 
     agencia_base = relationship("Agencia", backref="empleados")
@@ -67,6 +71,7 @@ class AreaRestringida(Base):
     nivel_riesgo = Column(String(50), nullable=False)
     id_permiso_requerido = Column(BigInteger, ForeignKey("permisos.id_permiso", ondelete="SET NULL"), nullable=True)
     estado = Column(Boolean, default=True)
+    horario = Column(String(50), default='08:00 - 18:00')
 
     permiso_requerido = relationship("Permiso")
 

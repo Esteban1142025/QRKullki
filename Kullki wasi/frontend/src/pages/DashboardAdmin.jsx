@@ -1,22 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { EMPLOYEES, ACCESS_LOGS, SECURITY_ALERTS, QR_DEVICES, AGENCIES } from '../data/mockData';
+import apiClient from '../services/api/apiClient';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar, Legend, Cell
 } from 'recharts';
 import {
-  MdSupervisedUserCircle,
-  MdCheckCircle,
-  MdWarning,
-  MdRouter,
-  MdSecurity,
-  MdSensors,
-  MdReceiptLong,
-  MdArrowForward,
-  MdTrendingUp,
-  MdStore,
-  MdBadge
+  MdSupervisedUserCircle, MdCheckCircle, MdWarning, MdRouter,
+  MdSecurity, MdSensors, MdReceiptLong, MdArrowForward,
+  MdTrendingUp, MdStore, MdBadge
 } from 'react-icons/md';
 import { Link } from 'react-router-dom';
 
@@ -31,15 +23,6 @@ const accessTimeData = [
   { time: '14:00', Autorizados: 25, Denegados: 2 },
   { time: '15:00', Autorizados: 20, Denegados: 1 },
   { time: '16:00', Autorizados: 10, Denegados: 0 },
-];
-
-const agencyData = [
-  { name: 'Matriz',      Accesos: 154, Alertas: 2 },
-  { name: 'Pelileo',     Accesos: 48,  Alertas: 0 },
-  { name: 'Píllaro',     Accesos: 32,  Alertas: 2 },
-  { name: 'Baños',       Accesos: 28,  Alertas: 1 },
-  { name: 'Salcedo',     Accesos: 18,  Alertas: 1 },
-  { name: 'Quisapincha', Accesos: 12,  Alertas: 0 },
 ];
 
 const CustomTooltip = ({ active, payload, label }) => {
@@ -58,7 +41,7 @@ const CustomTooltip = ({ active, payload, label }) => {
     );
   }
   return null;
-}
+};
 
 const KPICard = ({ label, value, sub, subColor = 'text-slate-500', icon: Icon, iconBg, iconColor, trend, trendUp }) => (
   <div className="card-corporate p-8 flex items-center justify-between cursor-default">
@@ -82,24 +65,50 @@ const KPICard = ({ label, value, sub, subColor = 'text-slate-500', icon: Icon, i
 
 const DashboardAdmin = () => {
   const { user } = useAuth();
-  const [logs, setLogs] = useState(ACCESS_LOGS);
-  const activeAlertsCount = SECURITY_ALERTS.filter(a => !a.isResolved).length;
-  const activeEmployees   = EMPLOYEES.filter(e => e.status === 'Activo').length;
-  const activeAgencies = AGENCIES.filter(a => a.status === 'Activo').length;
-  const credentialsCount = EMPLOYEES.filter(e => e.qrCode).length;
-  const accessToday = logs.filter(l => new Date(l.timestamp).toDateString() === new Date().toDateString()).length;
+  const [employees, setEmployees] = useState([]);
+  const [agencies, setAgencies] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const raw = localStorage.getItem('kw_dynamic_logs');
-    if (raw) {
-      try { setLogs([...JSON.parse(raw), ...ACCESS_LOGS]); } catch (_) {}
-    }
+    const fetchAll = async () => {
+      try {
+        const [empRes, agRes, alertRes, logsRes] = await Promise.all([
+          apiClient.get('/empleados'),
+          apiClient.get('/agencias'),
+          apiClient.get('/security/alerts'),
+          apiClient.get('/audit-logs'),
+        ]);
+        setEmployees(empRes.data);
+        setAgencies(agRes.data);
+        setAlerts(alertRes.data);
+        setLogs(logsRes.data);
+      } catch (err) {
+        console.error('Error al cargar dashboard:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAll();
   }, []);
+
+  const activeEmployees   = employees.filter(e => e.status === 'Activo').length;
+  const activeAgencies    = agencies.filter(a => a.status === 'Activo').length;
+  const activeAlerts      = alerts.filter(a => !a.isResolved).length;
+  const credentialsCount  = employees.length;
+  const accessToday       = logs.filter(l => new Date(l.timestamp).toDateString() === new Date().toDateString()).length;
+
+  const agencyData = agencies.map(a => ({
+    name: a.name.replace('Agencia ', '').replace('Matriz ', 'Matriz'),
+    Accesos: logs.filter(l => l.agency === a.id).length,
+    Alertas: alerts.filter(al => al.agency === a.id).length,
+  })).filter(a => a.Accesos > 0 || a.Accesos === 0);
 
   return (
     <div className="space-y-6">
 
-      {/* ── WELCOME BANNER ─────────────────────────── */}
+      {/* WELCOME BANNER */}
       <div className="card-corporate relative overflow-hidden p-8">
         <div className="absolute top-0 right-0 w-72 h-72 bg-[#8DC63F]/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-56 h-56 bg-[#facc15]/10 rounded-full blur-3xl pointer-events-none" />
@@ -125,22 +134,21 @@ const DashboardAdmin = () => {
         </div>
       </div>
 
-      {/* ── KPI CARDS ──────────────────────────────── */}
+      {/* KPI CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
           label="Total Personal"
-          value={EMPLOYEES.length}
+          value={loading ? '…' : employees.length}
           sub={`${activeEmployees} colaboradores activos`}
           subColor="text-[#8DC63F]"
           icon={MdSupervisedUserCircle}
           iconBg="bg-[#8DC63F]/10"
           iconColor="text-[#8DC63F]"
-          trend="+2%" trendUp={true}
         />
         <KPICard
           label="Agencias Activas"
-          value={activeAgencies}
-          sub={`${AGENCIES.length} en total`}
+          value={loading ? '…' : activeAgencies}
+          sub={`${agencies.length} en total`}
           subColor="text-blue-400"
           icon={MdStore}
           iconBg="bg-blue-500/10"
@@ -149,30 +157,26 @@ const DashboardAdmin = () => {
         />
         <KPICard
           label="Credenciales Emitidas"
-          value={credentialsCount}
+          value={loading ? '…' : credentialsCount}
           sub="Códigos QR activos"
           subColor="text-orange-400"
           icon={MdBadge}
           iconBg="bg-orange-500/10"
           iconColor="text-orange-400"
-          trend="+5%" trendUp={true}
         />
         <KPICard
-          label="Accesos Hoy"
-          value={accessToday || logs.length}
-          sub="100% validados por QR"
-          subColor="text-emerald-400"
-          icon={MdCheckCircle}
-          iconBg="bg-emerald-500/10"
-          iconColor="text-emerald-400"
-          trend="+12%" trendUp={true}
+          label="Alertas Activas"
+          value={loading ? '…' : activeAlerts}
+          sub={activeAlerts > 0 ? 'Requieren atención' : 'Sin amenazas activas'}
+          subColor={activeAlerts > 0 ? 'text-red-400' : 'text-emerald-400'}
+          icon={activeAlerts > 0 ? MdWarning : MdCheckCircle}
+          iconBg={activeAlerts > 0 ? 'bg-red-500/10' : 'bg-emerald-500/10'}
+          iconColor={activeAlerts > 0 ? 'text-red-400' : 'text-emerald-400'}
         />
       </div>
 
-      {/* ── CHARTS ─────────────────────────────────── */}
+      {/* CHARTS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* Área chart - flujo por hora */}
         <div className="card-corporate p-8">
           <div className="flex items-center justify-between mb-5">
             <div>
@@ -197,11 +201,11 @@ const DashboardAdmin = () => {
                 <defs>
                   <linearGradient id="gAuth" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%"  stopColor="#8DC63F" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#8DC63F" stopOpacity={0}    />
+                    <stop offset="95%" stopColor="#8DC63F" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="gDeny" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%"  stopColor="#ef4444" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}    />
+                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -215,25 +219,24 @@ const DashboardAdmin = () => {
           </div>
         </div>
 
-        {/* Bar chart - agencias */}
         <div className="card-corporate p-8">
           <div className="mb-5">
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
               <MdRouter size={16} className="text-[#8DC63F]" />
               Actividad por Sucursal
             </h3>
-            <p className="text-[10px] text-slate-500 mt-0.5">Comparativa de accesos y alertas entre agencias</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">Comparativa de empleados y alertas entre agencias</p>
           </div>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={agencyData} margin={{ top: 5, right: 5, left: -28, bottom: 0 }}>
+              <BarChart data={agencyData.length > 0 ? agencyData : agencies.map(a => ({ name: a.id, Empleados: employees.filter(e => e.agency === a.id).length, Alertas: 0 }))} margin={{ top: 5, right: 5, left: -28, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} />
                 <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '8px', color: '#64748b' }} />
                 <Bar dataKey="Accesos" radius={[6, 6, 0, 0]}>
-                  {agencyData.map((_, i) => (
+                  {(agencyData.length > 0 ? agencyData : agencies).map((_, i) => (
                     <Cell key={i} fill={i === 0 ? '#8DC63F' : '#cbd5e1'} />
                   ))}
                 </Bar>
@@ -244,10 +247,9 @@ const DashboardAdmin = () => {
         </div>
       </div>
 
-      {/* ── RECENT LOGS + SECURITY CHECKLIST ───────── */}
+      {/* RECENT LOGS + SECURITY CHECKLIST */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* Logs recientes */}
         <div className="card-corporate p-8 lg:col-span-2 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -266,20 +268,13 @@ const DashboardAdmin = () => {
           </div>
 
           <div className="space-y-2 overflow-y-auto max-h-72 flex-1 pr-1">
-            {logs.slice(0, 7).map((log) => {
+            {logs.length > 0 ? logs.slice(0, 7).map((log) => {
               const ok = log.status === 'Autorizado';
               const initials = (log.name || 'U').split(' ').filter(Boolean).map(n => n[0]).slice(0, 2).join('').toUpperCase();
               return (
-                <div
-                  key={log.id}
-                  className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-xs border transition-all ${
-                    ok ? 'bg-white border-slate-200' : 'bg-red-50/50 border-red-200'
-                  }`}
-                >
+                <div key={log.id} className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-xs border transition-all ${ok ? 'bg-white border-slate-200' : 'bg-red-50/50 border-red-200'}`}>
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-[11px] shrink-0 ${
-                      ok ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'
-                    }`}>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-[11px] shrink-0 ${ok ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
                       {initials}
                     </div>
                     <div className="min-w-0">
@@ -288,11 +283,7 @@ const DashboardAdmin = () => {
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <span className={`inline-block px-3 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-widest ${
-                      ok
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span className={`inline-block px-3 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-widest ${ok ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
                       {log.status}
                     </span>
                     <p className="text-[9px] text-slate-600 mt-1 font-mono">
@@ -301,18 +292,20 @@ const DashboardAdmin = () => {
                   </div>
                 </div>
               );
-            })}
+            }) : (
+              <div className="flex items-center justify-center h-40 text-slate-400 text-sm font-medium">
+                <p className="text-center">Sin registros de acceso aún.<br /><span className="text-xs">Los escaneos QR aparecerán aquí.</span></p>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Security checklist */}
         <div className="card-corporate p-8 flex flex-col justify-between">
           <div className="space-y-4">
             <div>
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Cumplimiento SEPS</h3>
               <p className="text-[10px] text-slate-500 mt-0.5">Estado de políticas institucionales activas</p>
             </div>
-
             {[
               { icon: MdSecurity,    label: 'Control RBAC Activo',        desc: 'Módulos dinámicos por rol en tiempo real.' },
               { icon: MdSensors,     label: 'Dispositivos QR Cifrados',   desc: 'Terminales con latidos y firma hash.' },
@@ -329,14 +322,12 @@ const DashboardAdmin = () => {
               </div>
             ))}
           </div>
-
           <div className="pt-4 mt-2 border-t border-slate-200 text-center">
             <p className="text-[10px] text-slate-500 font-bold">Cooperativa Kullki Wasi Ltda.</p>
             <p className="text-[9px] text-[#79ac34] font-black uppercase tracking-wider mt-0.5">Segmento Financiero 1 — Ecuador</p>
           </div>
         </div>
       </div>
-
     </div>
   );
 };

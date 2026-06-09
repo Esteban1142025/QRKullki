@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { ACCESS_LOGS, AGENCIES } from '../data/mockData';
+import apiClient from '../services/api/apiClient';
 import Swal from 'sweetalert2';
-import { MdSearch, MdFileDownload, MdRefresh, MdFilterList, MdPictureAsPdf, MdChevronLeft, MdChevronRight } from 'react-icons/md';
+import { MdSearch, MdFileDownload, MdRefresh, MdPictureAsPdf, MdChevronLeft, MdChevronRight } from 'react-icons/md';
 
 const RISK_COLORS = {
   Alto:  'badge-inactive',
@@ -16,8 +15,9 @@ const STATUS_COLORS = {
 };
 
 const Logs = () => {
-  const { user } = useAuth();
   const [logs, setLogs]             = useState([]);
+  const [agencies, setAgencies]     = useState([]);
+  const [loading, setLoading]       = useState(true);
   const [search, setSearch]         = useState('');
   const [filterAgency, setAgency]   = useState('ALL');
   const [filterStatus, setStatus]   = useState('ALL');
@@ -25,25 +25,29 @@ const Logs = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  const loadLogs = useCallback(() => {
+  const loadLogs = useCallback(async () => {
+    setLoading(true);
     try {
-      const dyn = localStorage.getItem('kw_dynamic_logs');
-      const dynamic = dyn ? JSON.parse(dyn) : [];
-      // Deduplicate by id
-      const seen = new Set();
-      const merged = [...dynamic, ...ACCESS_LOGS].filter(l => {
-        if (seen.has(l.id)) return false;
-        seen.add(l.id); return true;
-      });
-      setLogs(merged);
-    } catch { setLogs(ACCESS_LOGS); }
+      const [logsRes, agRes] = await Promise.all([
+        apiClient.get('/audit-logs'),
+        apiClient.get('/agencias'),
+      ]);
+      setLogs(logsRes.data);
+      setAgencies(agRes.data);
+    } catch (err) {
+      console.error('Error al cargar bitácora:', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { loadLogs(); }, [loadLogs]);
 
   const filtered = logs.filter(l => {
     const q = search.toLowerCase();
-    const matchQ = l.name.toLowerCase().includes(q) || l.employeeId.toLowerCase().includes(q) || (l.id ?? '').toLowerCase().includes(q);
+    const matchQ = (l.name || '').toLowerCase().includes(q) ||
+                   (l.employeeId || '').toLowerCase().includes(q) ||
+                   (l.id || '').toLowerCase().includes(q);
     return matchQ
       && (filterAgency === 'ALL' || l.agency === filterAgency)
       && (filterStatus === 'ALL' || l.status === filterStatus)
@@ -53,11 +57,10 @@ const Logs = () => {
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
   const currentLogs = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  // Reiniciar página si cambian los filtros
   useEffect(() => { setCurrentPage(1); }, [search, filterAgency, filterStatus, filterRisk]);
 
-  const handleRefresh = () => {
-    loadLogs();
+  const handleRefresh = async () => {
+    await loadLogs();
     Swal.fire({ icon: 'success', title: 'Bitácora sincronizada', timer: 900, showConfirmButton: false, background: '#0d1424', color: '#f1f5f9' });
   };
 
@@ -73,27 +76,20 @@ const Logs = () => {
             l.id, l.timestamp, l.employeeId, l.name, l.role,
             l.agency, l.area, l.device, l.status, l.details, l.risk,
           ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','));
-
-          const csv = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+          const csv = '﻿' + [headers.join(','), ...rows].join('\n');
           const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-          const a   = Object.assign(document.createElement('a'), { href: url, download: `trazabilidad_kullki_wasi_${new Date().toISOString().slice(0,10)}.csv` });
+          const a = Object.assign(document.createElement('a'), { href: url, download: `trazabilidad_kullki_wasi_${new Date().toISOString().slice(0,10)}.csv` });
           document.body.appendChild(a); a.click(); document.body.removeChild(a);
           URL.revokeObjectURL(url);
-
           Swal.fire({ icon: 'success', title: 'Reporte descargado', text: 'Archivo CSV guardado en su dispositivo.', confirmButtonColor: '#8DC63F', background: '#0d1424', color: '#f1f5f9' });
         }, 1000);
       },
     });
   };
 
-  const handleExportPDF = () => {
-    window.print();
-  };
-
   return (
     <div className="space-y-6">
 
-      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-black text-slate-800 font-['Outfit']">Bitácora Institucional de Accesos</h2>
@@ -103,18 +99,17 @@ const Logs = () => {
           <button onClick={handleRefresh} className="btn-icon" title="Refrescar">
             <MdRefresh size={18} />
           </button>
-          <button onClick={handleExport} className="btn-secondary">
+          <button onClick={handleExport} className="btn-secondary" disabled={logs.length === 0}>
             <MdFileDownload size={16} className="text-[#79ac34]" />
             Exportar CSV
           </button>
-          <button onClick={handleExportPDF} className="btn-danger text-white hover:text-white" style={{color: 'white'}}>
+          <button onClick={() => window.print()} className="btn-danger text-white hover:text-white" style={{color: 'white'}}>
             <MdPictureAsPdf size={16} />
             Exportar PDF
           </button>
         </div>
       </div>
 
-      {/* Stats strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           ['Total Registros', logs.length, 'text-slate-800'],
@@ -129,21 +124,18 @@ const Logs = () => {
         ))}
       </div>
 
-      {/* Filters */}
       <div className="card-corporate p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
         <div className="space-y-1">
           <label className="form-label flex items-center gap-1">
             <MdSearch size={14} /> Buscar
           </label>
-          <div className="relative">
-            <input type="text" placeholder="Nombre, ID o código..." value={search} onChange={e => setSearch(e.target.value)} className="w-full" />
-          </div>
+          <input type="text" placeholder="Nombre, ID o código..." value={search} onChange={e => setSearch(e.target.value)} className="w-full" />
         </div>
         <div className="space-y-1">
           <label className="form-label">Agencia</label>
           <select value={filterAgency} onChange={e => setAgency(e.target.value)} className="w-full">
             <option value="ALL">Todas las Agencias</option>
-            {AGENCIES.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            {agencies.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         </div>
         <div className="space-y-1">
@@ -165,21 +157,25 @@ const Logs = () => {
         </div>
       </div>
 
-      {/* Table */}
       <div className="card-corporate overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs data-table">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
                 {['ID', 'Fecha / Hora', 'Colaborador', 'Área / Dispositivo', 'Agencia', 'Estado', 'Riesgo'].map(h => (
-                  <th key={h} className="px-4 py-3.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                    {h}
-                  </th>
+                  <th key={h} className="px-4 py-3.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {currentLogs.length > 0 ? currentLogs.map(log => (
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
+                    <div className="w-8 h-8 border-4 border-[#8DC63F] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                    Cargando bitácora...
+                  </td>
+                </tr>
+              ) : currentLogs.length > 0 ? currentLogs.map(log => (
                 <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3 font-mono text-slate-600 text-[10px] whitespace-nowrap">{log.id}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
@@ -196,20 +192,17 @@ const Logs = () => {
                   </td>
                   <td className="px-4 py-3 text-slate-600">{log.agency}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`badge ${STATUS_COLORS[log.status] ?? ''}`}>
-                      {log.status}
-                    </span>
+                    <span className={`badge ${STATUS_COLORS[log.status] ?? ''}`}>{log.status}</span>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`badge ${RISK_COLORS[log.risk] ?? RISK_COLORS.Bajo}`}>
-                      {log.risk}
-                    </span>
+                    <span className={`badge ${RISK_COLORS[log.risk] ?? RISK_COLORS.Bajo}`}>{log.risk}</span>
                   </td>
                 </tr>
               )) : (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
-                    No hay registros de trazabilidad con los filtros aplicados.
+                    <p className="font-medium">No hay registros de trazabilidad disponibles.</p>
+                    <p className="text-xs mt-1">Los accesos QR escaneados aparecerán aquí automáticamente.</p>
                   </td>
                 </tr>
               )}
@@ -217,28 +210,18 @@ const Logs = () => {
           </table>
         </div>
         <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3 text-[10px] text-slate-500">
-          <span>Mostrando <strong className="text-slate-700">{currentLogs.length}</strong> de <strong className="text-slate-700">{filtered.length}</strong> registros filtrados</span>
-          
+          <span>Mostrando <strong className="text-slate-700">{currentLogs.length}</strong> de <strong className="text-slate-700">{filtered.length}</strong> registros</span>
           <div className="flex items-center gap-1">
-            <button 
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="btn-icon disabled:opacity-50"
-            >
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="btn-icon disabled:opacity-50">
               <MdChevronLeft size={16} />
             </button>
             <span className="px-2 font-bold text-slate-700">Página {currentPage} de {totalPages || 1}</span>
-            <button 
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages || totalPages === 0}
-              className="btn-icon disabled:opacity-50"
-            >
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages || totalPages === 0} className="btn-icon disabled:opacity-50">
               <MdChevronRight size={16} />
             </button>
           </div>
         </div>
       </div>
-
     </div>
   );
 };
