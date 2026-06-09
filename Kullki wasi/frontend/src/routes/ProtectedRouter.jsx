@@ -2,7 +2,9 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-export const ProtectedRoute = ({ children, allowedRoles }) => {
+// allowedRoles: array de roles con acceso por defecto
+// allowedPermission: código de permiso BD que TAMBIÉN otorga acceso (coincide con MENU_ITEMS)
+export const ProtectedRoute = ({ children, allowedRoles, allowedPermission }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
 
@@ -18,13 +20,24 @@ export const ProtectedRoute = ({ children, allowedRoles }) => {
   }
 
   if (!user) {
-    // Redirigir a login guardando la ubicación original
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  // Si no hay restricción de roles/permisos, permitir acceso
+  if (!allowedRoles && !allowedPermission) return children;
 
-  return children;
+  const userPerms = user.permissions || [];
+  const isSuperUser = userPerms.includes('all');
+
+  // SuperAdmin siempre tiene acceso
+  if (isSuperUser) return children;
+
+  // Acceso por rol hardcoded
+  if (allowedRoles && allowedRoles.includes(user.role)) return children;
+
+  // Acceso por permiso otorgado dinámicamente desde RBAC
+  if (allowedPermission && userPerms.includes(allowedPermission)) return children;
+
+  // Sin acceso: redirigir al dashboard
+  return <Navigate to="/dashboard" replace />;
 };

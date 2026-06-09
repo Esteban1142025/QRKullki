@@ -16,13 +16,23 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    // Restaurar sesión activa
+    // Restaurar sesión activa y refrescar permisos desde la BD
     const storedUser = localStorage.getItem('kw_user');
     const storedToken = localStorage.getItem('kw_token');
-    
+
     if (storedUser && storedToken) {
       try {
-        setUser(JSON.parse(storedUser));
+        const parsed = JSON.parse(storedUser);
+        setUser(parsed);
+        // Refrescar permisos desde la BD en background (por si cambiaron en RBAC)
+        apiClient.get(`/auth/permissions/${parsed.dni}`)
+          .then(res => {
+            const freshPerms = res.data.permissions;
+            const updated = { ...parsed, permissions: freshPerms };
+            localStorage.setItem('kw_user', JSON.stringify(updated));
+            setUser(updated);
+          })
+          .catch(() => { /* falla silenciosa — usamos los permisos del localStorage */ });
       } catch (e) {
         localStorage.removeItem('kw_user');
         localStorage.removeItem('kw_token');

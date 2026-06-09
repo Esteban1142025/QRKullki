@@ -206,52 +206,97 @@ const Agencies = () => {
 
       {showForm && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xl">
+          <div className="w-full max-w-2xl bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xl">
             <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-              <h3 className="text-sm font-black text-slate-800 font-['Outfit'] uppercase tracking-wider">
-                {editing ? 'Editar Agencia' : 'Nueva Agencia'}
-              </h3>
+              <div>
+                <h3 className="text-sm font-black text-slate-800 font-['Outfit'] uppercase tracking-wider">
+                  {editing ? 'Editar Agencia' : 'Nueva Agencia'}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5 font-medium">
+                  {editing ? 'Modifica los datos de la agencia seleccionada' : 'Complete los campos para registrar una nueva agencia'}
+                </p>
+              </div>
               <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600">
                 <MdClose size={20} />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-6 space-y-5">
+              {/* Fila 1: Código + Tipo */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1 col-span-2 sm:col-span-1">
-                  <label className="form-label">ID (Código)</label>
-                  <input type="text" value={form.id} onChange={e => setForm({...form, id: e.target.value.toUpperCase()})} placeholder="Ej: MAT" disabled={!!editing} className="form-input" />
+                <div className="space-y-1.5">
+                  <label className="form-label">ID / Código</label>
+                  <input
+                    type="text"
+                    value={form.id}
+                    onChange={e => setForm({...form, id: e.target.value.toUpperCase()})}
+                    placeholder="Ej: MAT, PEL, PIL..."
+                    disabled={!!editing}
+                    className="form-input disabled:bg-slate-100 disabled:text-slate-400"
+                  />
+                  <p className="text-[10px] text-slate-400">Código único de 3 letras. No editable tras crear.</p>
                 </div>
-                <div className="space-y-1 col-span-2 sm:col-span-1">
-                  <label className="form-label">Tipo</label>
+                <div className="space-y-1.5">
+                  <label className="form-label">Tipo de Agencia</label>
                   <select value={form.type} onChange={e => setForm({...form, type: e.target.value})} className="form-input">
                     <option value="Principal">Principal</option>
                     <option value="Sucursal">Sucursal</option>
                     <option value="Extensión">Extensión</option>
                   </select>
                 </div>
-                <div className="space-y-1 col-span-2">
-                  <label className="form-label">Nombre</label>
-                  <input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="Ej: Matriz Ambato" className="form-input" />
-                </div>
-                <div className="space-y-1 col-span-2">
-                  <label className="form-label">Dirección</label>
-                  <input type="text" value={form.address} onChange={e => setForm({...form, address: e.target.value})} className="form-input" />
-                </div>
-                <div className="space-y-1 col-span-2 sm:col-span-1">
+              </div>
+
+              {/* Fila 2: Nombre (ancho completo) */}
+              <div className="space-y-1.5">
+                <label className="form-label">Nombre de la Agencia</label>
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={e => setForm({...form, name: e.target.value})}
+                  placeholder="Ej: Matriz Ambato, Agencia Pelileo..."
+                  className="form-input"
+                />
+              </div>
+
+              {/* Fila 3: Dirección (ancho completo) */}
+              <div className="space-y-1.5">
+                <label className="form-label">Dirección</label>
+                <input
+                  type="text"
+                  value={form.address}
+                  onChange={e => setForm({...form, address: e.target.value})}
+                  placeholder="Ej: Av. Celedonio Toledo & Quis Quis"
+                  className="form-input"
+                />
+              </div>
+
+              {/* Fila 4: Teléfono + Estado */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
                   <label className="form-label">Teléfono</label>
-                  <input type="text" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} className="form-input" />
+                  <input
+                    type="text"
+                    value={form.phone}
+                    onChange={e => setForm({...form, phone: e.target.value})}
+                    placeholder="Ej: (03) 282-1234"
+                    className="form-input"
+                  />
                 </div>
-                <div className="space-y-1 col-span-2 sm:col-span-1">
-                  <label className="form-label">Estado</label>
+                <div className="space-y-1.5">
+                  <label className="form-label">Estado Operacional</label>
                   <select value={form.status} onChange={e => setForm({...form, status: e.target.value})} className="form-input">
                     <option value="Activo">Activo</option>
                     <option value="Inactivo">Inactivo</option>
                   </select>
                 </div>
               </div>
-              <div className="flex justify-end pt-4 mt-2">
+
+              {/* Acciones */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 mt-2">
+                <button type="button" onClick={() => setShowForm(false)} className="px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-all cursor-pointer">
+                  Cancelar
+                </button>
                 <button type="submit" className="btn-primary">
-                  <MdSave size={18} /> Guardar
+                  <MdSave size={18} /> Guardar Agencia
                 </button>
               </div>
             </form>

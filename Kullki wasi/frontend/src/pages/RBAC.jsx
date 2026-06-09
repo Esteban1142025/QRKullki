@@ -19,19 +19,16 @@ const ROLE_DISPLAY = {
   empleado:        { displayName: 'Empleado',                 description: 'Consulta de permisos propios y descarga de credencial QR' },
 };
 
+// IDs deben coincidir EXACTAMENTE con codigo_permiso en la tabla permisos de la BD
 const PERMISSIONS = [
-  { id: 'all',             label: 'Acceso Total (SuperAdmin)',  category: 'Sistema'   },
-  { id: 'read_employees',  label: 'Ver Colaboradores',          category: 'Personal'  },
-  { id: 'write_employees', label: 'Modificar Colaboradores',    category: 'Personal'  },
-  { id: 'read_logs',       label: 'Consultar Bitácoras',        category: 'Auditoría' },
-  { id: 'read_alerts',     label: 'Ver Alertas Críticas',       category: 'Seguridad' },
-  { id: 'write_security',  label: 'Resolver Incidentes',        category: 'Seguridad' },
-  { id: 'validate_qr',     label: 'Simular Escaneo QR',         category: 'Accesos'   },
-  { id: 'read_reports',    label: 'Generar Reportes PDF/XLS',   category: 'Auditoría' },
-  { id: 'read_own_profile',label: 'Ver Perfil Propio',          category: 'Personal'  },
-  { id: 'read_own_qr',     label: 'Descargar Credencial QR',    category: 'Accesos'   },
-  { id: 'read_audit',      label: 'Acceso a Auditoría',         category: 'Auditoría' },
-  { id: 'acceso_total',    label: 'Acceso Total a Áreas',       category: 'Accesos'   },
+  { id: 'all',                label: 'Acceso Total (SuperAdmin)',        category: 'Sistema'   },
+  { id: 'acceso_total',       label: 'Acceso Total a Áreas Restringidas',category: 'Accesos'   },
+  { id: 'gestionar_usuarios', label: 'Gestionar Colaboradores',          category: 'Personal'  },
+  { id: 'ver_reportes',       label: 'Ver Reportes de Accesos',          category: 'Auditoría' },
+  { id: 'acceso_boveda',      label: 'Acceso a la Bóveda Principal',     category: 'Seguridad' },
+  { id: 'acceso_cajas',       label: 'Acceso al Área de Cajas',          category: 'Accesos'   },
+  { id: 'acceso_servidores',  label: 'Acceso al Cuarto de Servidores',   category: 'Accesos'   },
+  { id: 'acceso_archivo',     label: 'Acceso al Archivo General',        category: 'Auditoría' },
 ];
 
 const CATEGORY_COLORS = {
@@ -105,11 +102,24 @@ const RBAC = () => {
 
     setSaving(true);
     try {
-      await apiClient.put(`/roles/${role.id_rol}`, { permissions: role.permissions });
+      const res = await apiClient.put(`/roles/${role.id_rol}`, { permissions: role.permissions });
+      const savedPerms = res.data.permissions || role.permissions;
+      const permLabels = savedPerms.length
+        ? savedPerms.map(p => PERMISSIONS.find(x => x.id === p)?.label || p).join(', ')
+        : 'Ninguno';
+
       Swal.fire({
         icon: 'success',
         title: 'Políticas RBAC Guardadas',
-        text: `Los permisos del rol '${role.name}' han sido actualizados en la base de datos.`,
+        html: `<p style="font-size:13px;color:#475569;margin-bottom:8px">
+                 Rol: <strong>${role.name}</strong>
+               </p>
+               <p style="font-size:12px;color:#64748b">
+                 Permisos activos: <strong>${permLabels}</strong>
+               </p>
+               <p style="font-size:11px;color:#94a3b8;margin-top:8px">
+                 Los cambios aplican en el próximo inicio de sesión del colaborador.
+               </p>`,
         confirmButtonColor: '#0d2347',
         background: '#ffffff',
         color: '#1e293b',

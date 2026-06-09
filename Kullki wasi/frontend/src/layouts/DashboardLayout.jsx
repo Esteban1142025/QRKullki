@@ -24,17 +24,19 @@ import {
   MdShield
 } from 'react-icons/md';
 
+// roles: acceso por rol (hardcoded). permission: código de permiso en BD que TAMBIÉN otorga acceso.
+// Un módulo es visible si user.role está en roles[], O si user.permissions incluye el campo permission.
 const MENU_ITEMS = [
-  { label: 'Dashboard',         path: '/dashboard',        icon: MdDashboard,     roles: [] },
-  { label: 'Colaboradores',     path: '/employees',        icon: MdPeople,        roles: ['admin', 'talento_humano'] },
-  { label: 'Roles y Permisos',  path: '/rbac',             icon: MdLayers,        roles: ['admin'] },
-  { label: 'Control QR',        path: '/qr-scanner',       icon: MdQrCodeScanner, roles: ['admin', 'seguridad_fisica', 'jefe_agencia', 'tecnico_ti'] },
-  { label: 'Áreas Críticas',    path: '/restricted-areas', icon: MdShield,        roles: ['admin', 'riesgos', 'seguridad_fisica'] },
-  { label: 'Bitácora',          path: '/logs',             icon: MdHistory,       roles: ['admin', 'riesgos', 'auditor', 'tecnico_ti'] },
-  { label: 'Auditoría',         path: '/audit',            icon: MdVerifiedUser,  roles: ['admin', 'auditor'] },
-  { label: 'Alertas',           path: '/security',         icon: MdWarning,       roles: ['admin', 'riesgos', 'seguridad_fisica'] },
-  { label: 'Agencias',          path: '/agencies',         icon: MdStore,         roles: ['admin', 'jefe_agencia'] },
-  { label: 'Configuración',     path: '/settings',         icon: MdSettings,      roles: ['admin'] },
+  { label: 'Dashboard',         path: '/dashboard',        icon: MdDashboard,     roles: [],                                                           permission: null              },
+  { label: 'Colaboradores',     path: '/employees',        icon: MdPeople,        roles: ['admin', 'talento_humano'],                                  permission: 'gestionar_usuarios' },
+  { label: 'Roles y Permisos',  path: '/rbac',             icon: MdLayers,        roles: ['admin'],                                                    permission: 'all'             },
+  { label: 'Control QR',        path: '/qr-scanner',       icon: MdQrCodeScanner, roles: ['admin', 'seguridad_fisica', 'jefe_agencia', 'tecnico_ti'],  permission: 'acceso_total'    },
+  { label: 'Áreas Críticas',    path: '/restricted-areas', icon: MdShield,        roles: ['admin', 'riesgos', 'seguridad_fisica'],                     permission: 'acceso_boveda'   },
+  { label: 'Bitácora',          path: '/logs',             icon: MdHistory,       roles: ['admin', 'riesgos', 'auditor', 'tecnico_ti'],                permission: 'ver_reportes'    },
+  { label: 'Auditoría',         path: '/audit',            icon: MdVerifiedUser,  roles: ['admin', 'auditor'],                                         permission: 'acceso_archivo'  },
+  { label: 'Alertas',           path: '/security',         icon: MdWarning,       roles: ['admin', 'riesgos', 'seguridad_fisica'],                     permission: 'acceso_boveda'   },
+  { label: 'Agencias',          path: '/agencies',         icon: MdStore,         roles: ['admin', 'jefe_agencia'],                                    permission: null              },
+  { label: 'Configuración',     path: '/settings',         icon: MdSettings,      roles: ['admin'],                                                    permission: 'all'             },
 ];
 
 const DashboardLayout = () => {
@@ -105,9 +107,20 @@ const DashboardLayout = () => {
     setShowRoleSwitcher(false);
   }, [location.pathname]);
 
-  const filteredMenu = MENU_ITEMS.filter(item =>
-    item.roles.length === 0 || item.roles.includes(user?.role)
-  );
+  const userPerms = user?.permissions || [];
+  const isSuperUser = userPerms.includes('all');
+
+  const filteredMenu = MENU_ITEMS.filter(item => {
+    // Dashboard y módulos sin restricción: siempre visibles
+    if (item.roles.length === 0 && !item.permission) return true;
+    // SuperAdmin ve todo
+    if (isSuperUser) return true;
+    // Acceso por rol (hardcoded)
+    if (item.roles.length > 0 && item.roles.includes(user?.role)) return true;
+    // Acceso por permiso de BD (asignado dinámicamente desde RBAC)
+    if (item.permission && userPerms.includes(item.permission)) return true;
+    return false;
+  });
 
   const activeLabel = MENU_ITEMS.find(i => i.path === location.pathname)?.label ?? 'Detalle';
   const breadcrumb  = location.pathname === '/dashboard' ? 'Panel Principal' : activeLabel;

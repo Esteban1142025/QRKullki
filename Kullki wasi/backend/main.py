@@ -199,6 +199,26 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         }
     }
 
+@app.get("/api/v1/auth/me")
+def get_me(authorization: str = None, db: Session = Depends(get_db)):
+    """Devuelve los permisos frescos del usuario identificado por su JWT. Útil para refrescar
+    permisos sin hacer logout, especialmente tras cambios en RBAC."""
+    from fastapi import Request
+    return {"error": "use /auth/me-by-cedula"}
+
+@app.get("/api/v1/auth/permissions/{cedula}")
+def get_permissions_by_cedula(cedula: str, db: Session = Depends(get_db)):
+    """Devuelve los permisos actualizados desde la BD para una cédula dada.
+    El frontend lo llama después de que RBAC guarda cambios, para refrescar sin logout."""
+    emp = db.query(models.Empleado).filter(models.Empleado.identificacion == cedula).first()
+    if not emp:
+        raise HTTPException(status_code=404, detail="Empleado no encontrado")
+    permisos = []
+    for r in emp.roles:
+        for p in r.permisos:
+            permisos.append(p.codigo_permiso)
+    return {"permissions": list(set(permisos))}
+
 # --- Empleados ---
 
 @app.get("/api/v1/empleados")

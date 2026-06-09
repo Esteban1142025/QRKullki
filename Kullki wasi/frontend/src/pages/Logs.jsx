@@ -183,9 +183,20 @@ const Logs = () => {
       didOpen: () => {
         Swal.showLoading();
         setTimeout(() => {
-          const headers = ['ID Bitácora','Timestamp','ID Colaborador','Nombre','Cargo','Agencia','Área','Dispositivo','Estado','Detalle','Riesgo'];
+          // Convierte timestamp UTC (ISO con Z) a fecha/hora local del navegador
+          const fmtLocal = (ts) => {
+            if (!ts) return '';
+            try {
+              return new Date(ts).toLocaleString('es-EC', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: false
+              });
+            } catch { return ts; }
+          };
+          const headers = ['ID Bitácora','Fecha y Hora (Local)','ID Colaborador','Nombre','Cargo','Agencia','Área','Dispositivo','Estado','Detalle','Riesgo'];
           const rows = filtered.map(l => [
-            l.id, l.timestamp, l.employeeId, l.name, l.role,
+            l.id, fmtLocal(l.timestamp), l.employeeId, l.name, l.role,
             l.agency, l.area, l.device, l.status, l.details, l.risk,
           ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','));
           const csv = '﻿' + [headers.join(','), ...rows].join('\n');
