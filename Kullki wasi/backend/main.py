@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from typing import List, Optional
 import database
 import models
@@ -61,9 +61,18 @@ def get_db():
 # --- Schemas ---
 
 class LoginRequest(BaseModel):
-    dniOrEmail: str
+    cedula: str
     password: str
     totpCode: Optional[str] = None  # Código QR Dinámico (6 dígitos)
+
+    @field_validator('cedula')
+    @classmethod
+    def validate_cedula(cls, v):
+        if not v.isdigit():
+            raise ValueError('La cédula debe contener solo números')
+        if len(v) != 10:
+            raise ValueError('La cédula debe tener exactamente 10 dígitos')
+        return v
 
 class EmpleadoBase(BaseModel):
     identificacion: str
@@ -90,22 +99,10 @@ class LogResponse(BaseModel):
 @app.post("/api/v1/auth/login")
 def login(req: LoginRequest, db: Session = Depends(get_db)):
     emp = db.query(models.Empleado).filter(
-        (models.Empleado.identificacion == req.dniOrEmail) | 
-        (models.Empleado.email == req.dniOrEmail)
+        models.Empleado.identificacion == req.cedula
     ).first()
     
     if not emp:
-        # Fallback para poder entrar si la DB está vacía o si el usuario usa admin sin DB
-        if req.dniOrEmail == "admin":
-            return {
-                "token": create_access_token({"sub": "admin", "roles": ["admin"]}),
-                "user": {
-                    "id": "KW-000",
-                    "name": "Administrador Fallback",
-                    "role": "admin",
-                    "permissions": ["acceso_total"]
-                }
-            }
         raise HTTPException(status_code=400, detail="Credenciales incorrectas")
         
     if emp.estado_laboral != "ACTIVO":

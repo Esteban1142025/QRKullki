@@ -62,20 +62,21 @@ def seed():
             db.refresh(agencia)
 
         # 4. Crear Usuarios
-        pwd_hash = bcrypt.hashpw("kullki123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        admin_pwd_hash = bcrypt.hashpw("admin123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        empleado_pwd_hash = bcrypt.hashpw("empleado123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         admin_totp = pyotp.random_base32()
         comun_totp = pyotp.random_base32()
 
         # Administrador
-        admin = db.query(models.Empleado).filter(models.Empleado.identificacion == "0000000000").first()
+        admin = db.query(models.Empleado).filter(models.Empleado.identificacion == "0987654321").first()
         if not admin:
             admin = models.Empleado(
-                identificacion="0000000000",
-                nombres="Super",
-                apellidos="Administrador",
-                email="admin@kullkiwasi.com",
+                identificacion="0987654321",
+                nombres="Carlos",
+                apellidos="Admin",
+                email="carlos.admin@kullkiwasi.com",
                 id_agencia_base=agencia.id_agencia,
-                password_hash=pwd_hash,
+                password_hash=admin_pwd_hash,
                 totp_secret=admin_totp,
                 estado_laboral="ACTIVO"
             )
@@ -83,15 +84,15 @@ def seed():
             db.add(admin)
 
         # Usuario Común
-        comun = db.query(models.Empleado).filter(models.Empleado.identificacion == "1111111111").first()
+        comun = db.query(models.Empleado).filter(models.Empleado.identificacion == "1712345678").first()
         if not comun:
             comun = models.Empleado(
-                identificacion="1111111111",
-                nombres="Empleado",
-                apellidos="Prueba",
-                email="empleado@kullkiwasi.com",
+                identificacion="1712345678",
+                nombres="Maria",
+                apellidos="Empleado",
+                email="maria.empleado@kullkiwasi.com",
                 id_agencia_base=agencia.id_agencia,
-                password_hash=pwd_hash,
+                password_hash=empleado_pwd_hash,
                 totp_secret=comun_totp,
                 estado_laboral="ACTIVO"
             )
@@ -101,8 +102,8 @@ def seed():
         db.commit()
         print("¡Base de datos poblada con éxito con RBAC Dinámico y TOTP!")
         print("--- Credenciales de Prueba ---")
-        print(f"Administrador -> DNI: 0000000000 | Pass: kullki123 | TOTP Secret: {admin_totp}")
-        print(f"Empleado      -> DNI: 1111111111 | Pass: kullki123 | TOTP Secret: {comun_totp}")
+        print(f"Administrador -> Cédula: 0987654321 | Pass: admin123 | TOTP Secret: {admin_totp}")
+        print(f"Empleado      -> Cédula: 1712345678 | Pass: empleado123 | TOTP Secret: {comun_totp}")
         print("Para generar tu código de 6 dígitos QR en pruebas, usa el TOTP Secret en un autenticador (o código Python con pyotp).")
 
     except Exception as e:

@@ -48,11 +48,11 @@ export const AuthProvider = ({ children }) => {
     };
   }, [navigate]);
 
-  const login = async (dniOrEmail, password) => {
+  const login = async (cedula, password) => {
     setLoading(true);
     try {
       const response = await apiClient.post('/auth/login', {
-        dniOrEmail,
+        cedula,
         password
       });
       
@@ -91,10 +91,13 @@ export const AuthProvider = ({ children }) => {
   const loginAsRole = async (roleId) => {
     // Como ahora usamos BD, solo funcionará si sabemos las credenciales o hacemos un endpoint especial.
     // Para no romper el UI, mapeamos a nuestros dos usuarios creados:
-    let dni = "1111111111"; // empleado
-    if (roleId === "admin" || roleId === "talento_humano") dni = "0000000000"; // admin
+    let cedula = "1712345678"; // empleado
+    if (roleId === "admin" || roleId === "talento_humano") cedula = "0987654321"; // admin
     
-    return login(dni, "kullki123");
+    if (cedula === "0987654321") {
+      return login(cedula, "admin123");
+    }
+    return login(cedula, "empleado123");
   };
 
   const hasPermission = (permission) => {

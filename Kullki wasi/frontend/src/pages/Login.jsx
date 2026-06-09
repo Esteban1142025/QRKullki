@@ -7,7 +7,7 @@ import { MdLockOutline, MdOutlinePersonOutline, MdArrowForward } from 'react-ico
 const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [dniOrEmail, setDniOrEmail] = useState('');
+  const [cedula, setCedula] = useState('');
   const [password, setPassword]     = useState('');
   const [loading, setLoading]       = useState(false);
   
@@ -73,13 +73,18 @@ const Login = () => {
       return;
     }
 
-    if (!dniOrEmail || !password) {
-      fireSwalLight({ icon: 'warning', title: 'Campos requeridos', text: 'Por favor, ingrese su usuario y contraseña.' });
+    if (!cedula || !password) {
+      fireSwalLight({ icon: 'warning', title: 'Campos requeridos', text: 'Por favor, ingrese su cédula y contraseña.' });
+      return;
+    }
+
+    if (!/^[0-9]{10}$/.test(cedula)) {
+      fireSwalLight({ icon: 'warning', title: 'Cédula inválida', text: 'La cédula debe tener exactamente 10 dígitos numéricos.' });
       return;
     }
     setLoading(true);
     try {
-      await login(dniOrEmail, password);
+      await login(cedula, password);
       // Success, clear attempts
       localStorage.removeItem('kw_failed_attempts');
       localStorage.removeItem('kw_lockout_time');
@@ -88,7 +93,7 @@ const Login = () => {
       const newAttempts = failedAttempts + 1;
       setFailedAttempts(newAttempts);
       localStorage.setItem('kw_failed_attempts', newAttempts.toString());
-      recordFailedAudit(dniOrEmail);
+      recordFailedAudit(cedula);
 
       if (newAttempts >= 3) {
         const blockUntil = new Date().getTime() + 30000; // block for 30s
@@ -115,8 +120,53 @@ const Login = () => {
     >
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]"></div>
 
-      <div className="relative z-10 w-full max-w-[420px]">
+      <div className="relative z-10 w-full max-w-6xl grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
         
+        {/* Cuadro de información de usuarios de prueba (temporal para desarrollo) */}
+        <div className="bg-white/95 backdrop-blur-md shadow-2xl rounded-2xl p-6 border border-white/20 w-full md:w-80">
+          <h3 className="text-lg font-bold text-slate-800 mb-4 text-center border-b pb-2">Usuarios de Prueba</h3>
+          
+          <div className="space-y-4">
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-bold text-sm">A</div>
+                <span className="font-bold text-green-800">Administrador</span>
+              </div>
+              <div className="text-sm space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Cédula:</span>
+                  <span className="font-mono font-bold text-slate-800">0987654321</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Clave:</span>
+                  <span className="font-mono font-bold text-slate-800">admin123</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm">E</div>
+                <span className="font-bold text-blue-800">Empleado</span>
+              </div>
+              <div className="text-sm space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Cédula:</span>
+                  <span className="font-mono font-bold text-slate-800">1712345678</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Clave:</span>
+                  <span className="font-mono font-bold text-slate-800">empleado123</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t text-center">
+            <p className="text-xs text-slate-500 italic">Información temporal para pruebas</p>
+          </div>
+        </div>
+
         <div className="bg-white/95 backdrop-blur-md shadow-2xl rounded-2xl p-8 md:p-10 border border-white/20">
           
           <div className="flex flex-col items-center mb-8">
@@ -140,7 +190,7 @@ const Login = () => {
             
             <div>
               <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-                Usuario o Cédula
+                Cédula
               </label>
               <div className="flex items-center bg-white border border-slate-300 rounded-xl focus-within:border-[#15803d] focus-within:ring-2 focus-within:ring-[#15803d]/20 transition-all overflow-hidden shadow-sm">
                 <div className="pl-4 pr-2 text-slate-400 flex items-center justify-center">
@@ -148,11 +198,17 @@ const Login = () => {
                 </div>
                 <input
                   type="text"
-                  placeholder="Ej: 1804293840"
-                  value={dniOrEmail}
-                  onChange={e => setDniOrEmail(e.target.value)}
+                  placeholder="Ej: 0987654321"
+                  value={cedula}
+                  onChange={e => {
+                    const value = e.target.value.replace(/[^0-9]/g, '');
+                    if (value.length <= 10) {
+                      setCedula(value);
+                    }
+                  }}
                   disabled={loading || lockoutTime !== null}
                   className="w-full py-3.5 pr-4 bg-transparent outline-none text-sm text-slate-800 placeholder-slate-400 disabled:bg-slate-50"
+                  maxLength={10}
                 />
               </div>
             </div>
@@ -207,14 +263,17 @@ const Login = () => {
             </button>
 
           </form>
+
+          <div className="mt-8 text-center">
+            <p className="text-xs text-slate-500 font-medium leading-relaxed">
+              Acceso restringido a personal de <span className="font-bold text-slate-700">Kullki Wasi</span><br/>
+              Toda actividad es auditada y monitoreada.
+            </p>
+          </div>
         </div>
 
-        <div className="mt-8 text-center relative z-10">
-          <p className="text-xs text-slate-300 font-medium leading-relaxed drop-shadow-md">
-            Acceso restringido a personal de <span className="font-bold text-white">Kullki Wasi Ltda.</span><br/>
-            Toda actividad es auditada y monitoreada.
-          </p>
-        </div>
+        {/* Espacio vacío para balancear el grid y centrar el login */}
+        <div className="hidden md:block"></div>
 
       </div>
     </div>
