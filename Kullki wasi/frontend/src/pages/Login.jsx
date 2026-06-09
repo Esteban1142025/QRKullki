@@ -66,6 +66,12 @@ const Login = () => {
     localStorage.setItem('kw_dynamic_logs', JSON.stringify([log, ...logs]));
   };
 
+  const copyToClipboard = (text, label) => {
+    navigator.clipboard.writeText(text).catch(err => {
+      console.error('Error al copiar:', err);
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (lockoutTime) {
@@ -126,37 +132,139 @@ const Login = () => {
         <div className="bg-white/95 backdrop-blur-md shadow-2xl rounded-2xl p-6 border border-white/20 w-full md:w-80">
           <h3 className="text-lg font-bold text-slate-800 mb-4 text-center border-b pb-2">Usuarios de Prueba</h3>
           
-          <div className="space-y-4">
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+          <div className="space-y-3">
+            <div className="bg-green-50 border border-green-200 rounded-xl p-3">
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-bold text-sm">A</div>
-                <span className="font-bold text-green-800">Administrador</span>
+                <div className="w-7 h-7 bg-green-600 rounded-full flex items-center justify-center text-white font-bold text-xs">A</div>
+                <span className="font-bold text-green-800 text-xs">Admin</span>
               </div>
-              <div className="text-sm space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Cédula:</span>
+              <div className="text-xs space-y-1">
+                <div className="flex justify-between cursor-pointer hover:bg-green-100 rounded px-1 py-0.5 transition-colors" onClick={() => copyToClipboard('0987654321', 'Cédula')}>
+                  <span className="text-slate-600">Céd:</span>
                   <span className="font-mono font-bold text-slate-800">0987654321</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between cursor-pointer hover:bg-green-100 rounded px-1 py-0.5 transition-colors" onClick={() => copyToClipboard('admin123', 'Clave')}>
                   <span className="text-slate-600">Clave:</span>
                   <span className="font-mono font-bold text-slate-800">admin123</span>
                 </div>
               </div>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm">E</div>
-                <span className="font-bold text-blue-800">Empleado</span>
+                <div className="w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xs">E</div>
+                <span className="font-bold text-blue-800 text-xs">Empleado</span>
               </div>
-              <div className="text-sm space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Cédula:</span>
+              <div className="text-xs space-y-1">
+                <div className="flex justify-between cursor-pointer hover:bg-blue-100 rounded px-1 py-0.5 transition-colors" onClick={() => copyToClipboard('1712345678', 'Cédula')}>
+                  <span className="text-slate-600">Céd:</span>
                   <span className="font-mono font-bold text-slate-800">1712345678</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between cursor-pointer hover:bg-blue-100 rounded px-1 py-0.5 transition-colors" onClick={() => copyToClipboard('empleado123', 'Clave')}>
                   <span className="text-slate-600">Clave:</span>
                   <span className="font-mono font-bold text-slate-800">empleado123</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-purple-50 border border-purple-200 rounded-xl p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-7 h-7 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xs">TH</div>
+                <span className="font-bold text-purple-800 text-xs">Talento Humano</span>
+              </div>
+              <div className="text-xs space-y-1">
+                <div className="flex justify-between cursor-pointer hover:bg-purple-100 rounded px-1 py-0.5 transition-colors" onClick={() => copyToClipboard('1234567890', 'Cédula')}>
+                  <span className="text-slate-600">Céd:</span>
+                  <span className="font-mono font-bold text-slate-800">1234567890</span>
+                </div>
+                <div className="flex justify-between cursor-pointer hover:bg-purple-100 rounded px-1 py-0.5 transition-colors" onClick={() => copyToClipboard('talento123', 'Clave')}>
+                  <span className="text-slate-600">Clave:</span>
+                  <span className="font-mono font-bold text-slate-800">talento123</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-7 h-7 bg-orange-600 rounded-full flex items-center justify-center text-white font-bold text-xs">R</div>
+                <span className="font-bold text-orange-800 text-xs">Riesgos</span>
+              </div>
+              <div className="text-xs space-y-1">
+                <div className="flex justify-between cursor-pointer hover:bg-orange-100 rounded px-1 py-0.5 transition-colors" onClick={() => copyToClipboard('2345678901', 'Cédula')}>
+                  <span className="text-slate-600">Céd:</span>
+                  <span className="font-mono font-bold text-slate-800">2345678901</span>
+                </div>
+                <div className="flex justify-between cursor-pointer hover:bg-orange-100 rounded px-1 py-0.5 transition-colors" onClick={() => copyToClipboard('riesgos123', 'Clave')}>
+                  <span className="text-slate-600">Clave:</span>
+                  <span className="font-mono font-bold text-slate-800">riesgos123</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-7 h-7 bg-red-600 rounded-full flex items-center justify-center text-white font-bold text-xs">SF</div>
+                <span className="font-bold text-red-800 text-xs">Seguridad Física</span>
+              </div>
+              <div className="text-xs space-y-1">
+                <div className="flex justify-between cursor-pointer hover:bg-red-100 rounded px-1 py-0.5 transition-colors" onClick={() => copyToClipboard('3456789012', 'Cédula')}>
+                  <span className="text-slate-600">Céd:</span>
+                  <span className="font-mono font-bold text-slate-800">3456789012</span>
+                </div>
+                <div className="flex justify-between cursor-pointer hover:bg-red-100 rounded px-1 py-0.5 transition-colors" onClick={() => copyToClipboard('seguridad123', 'Clave')}>
+                  <span className="text-slate-600">Clave:</span>
+                  <span className="font-mono font-bold text-slate-800">seguridad123</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-teal-50 border border-teal-200 rounded-xl p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-7 h-7 bg-teal-600 rounded-full flex items-center justify-center text-white font-bold text-xs">AU</div>
+                <span className="font-bold text-teal-800 text-xs">Auditor</span>
+              </div>
+              <div className="text-xs space-y-1">
+                <div className="flex justify-between cursor-pointer hover:bg-teal-100 rounded px-1 py-0.5 transition-colors" onClick={() => copyToClipboard('4567890123', 'Cédula')}>
+                  <span className="text-slate-600">Céd:</span>
+                  <span className="font-mono font-bold text-slate-800">4567890123</span>
+                </div>
+                <div className="flex justify-between cursor-pointer hover:bg-teal-100 rounded px-1 py-0.5 transition-colors" onClick={() => copyToClipboard('auditor123', 'Clave')}>
+                  <span className="text-slate-600">Clave:</span>
+                  <span className="font-mono font-bold text-slate-800">auditor123</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-7 h-7 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-xs">JA</div>
+                <span className="font-bold text-indigo-800 text-xs">Jefe Agencia</span>
+              </div>
+              <div className="text-xs space-y-1">
+                <div className="flex justify-between cursor-pointer hover:bg-indigo-100 rounded px-1 py-0.5 transition-colors" onClick={() => copyToClipboard('5678901234', 'Cédula')}>
+                  <span className="text-slate-600">Céd:</span>
+                  <span className="font-mono font-bold text-slate-800">5678901234</span>
+                </div>
+                <div className="flex justify-between cursor-pointer hover:bg-indigo-100 rounded px-1 py-0.5 transition-colors" onClick={() => copyToClipboard('jefe123', 'Clave')}>
+                  <span className="text-slate-600">Clave:</span>
+                  <span className="font-mono font-bold text-slate-800">jefe123</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-cyan-50 border border-cyan-200 rounded-xl p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-7 h-7 bg-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-xs">TI</div>
+                <span className="font-bold text-cyan-800 text-xs">Técnico TI</span>
+              </div>
+              <div className="text-xs space-y-1">
+                <div className="flex justify-between cursor-pointer hover:bg-cyan-100 rounded px-1 py-0.5 transition-colors" onClick={() => copyToClipboard('6789012345', 'Cédula')}>
+                  <span className="text-slate-600">Céd:</span>
+                  <span className="font-mono font-bold text-slate-800">6789012345</span>
+                </div>
+                <div className="flex justify-between cursor-pointer hover:bg-cyan-100 rounded px-1 py-0.5 transition-colors" onClick={() => copyToClipboard('tecnico123', 'Clave')}>
+                  <span className="text-slate-600">Clave:</span>
+                  <span className="font-mono font-bold text-slate-800">tecnico123</span>
                 </div>
               </div>
             </div>
