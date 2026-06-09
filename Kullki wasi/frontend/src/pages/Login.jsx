@@ -96,18 +96,33 @@ const Login = () => {
       localStorage.removeItem('kw_lockout_time');
       navigate('/dashboard');
     } catch (err) {
-      const newAttempts = failedAttempts + 1;
-      setFailedAttempts(newAttempts);
-      localStorage.setItem('kw_failed_attempts', newAttempts.toString());
+      // AuthContext re-lanza el error como new Error(detail), así que el mensaje está en err.message
+      const serverDetail = (err?.message || err?.response?.data?.detail || '').toLowerCase();
+      const isInactive = serverDetail.includes('inactivo') || serverDetail.includes('inactive');
+
       recordFailedAudit(cedula);
 
-      if (newAttempts >= 3) {
-        const blockUntil = new Date().getTime() + 30000; // block for 30s
-        setLockoutTime(blockUntil);
-        localStorage.setItem('kw_lockout_time', new Date(blockUntil).toISOString());
-        fireSwalLight({ icon: 'error', title: 'Bloqueo de Seguridad', text: 'Múltiples intentos fallidos. Sistema bloqueado temporalmente por 30 segundos.', confirmButtonColor: '#ef4444' });
+      if (isInactive) {
+        // Cuenta desactivada por administrador — no cuenta como intento fallido ni bloquea
+        fireSwalLight({
+          icon: 'warning',
+          title: 'Cuenta Inactiva',
+          text: 'Su cuenta ha sido desactivada por un administrador. Contacte a Talento Humano para más información.',
+          confirmButtonColor: '#f59e0b',
+        });
       } else {
-        fireSwalLight({ icon: 'error', title: 'Acceso Denegado', text: `Credenciales incorrectas. Intento ${newAttempts} de 3.`, confirmButtonColor: '#ef4444' });
+        const newAttempts = failedAttempts + 1;
+        setFailedAttempts(newAttempts);
+        localStorage.setItem('kw_failed_attempts', newAttempts.toString());
+
+        if (newAttempts >= 3) {
+          const blockUntil = new Date().getTime() + 30000;
+          setLockoutTime(blockUntil);
+          localStorage.setItem('kw_lockout_time', new Date(blockUntil).toISOString());
+          fireSwalLight({ icon: 'error', title: 'Bloqueo de Seguridad', text: 'Múltiples intentos fallidos. Sistema bloqueado temporalmente por 30 segundos.', confirmButtonColor: '#ef4444' });
+        } else {
+          fireSwalLight({ icon: 'error', title: 'Acceso Denegado', text: `Credenciales incorrectas. Intento ${newAttempts} de 3.`, confirmButtonColor: '#ef4444' });
+        }
       }
     } finally {
       setLoading(false);
