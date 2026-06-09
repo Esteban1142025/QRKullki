@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import text as sa_text
 from pydantic import BaseModel, ConfigDict, field_validator
 from typing import List, Optional
 import database
@@ -199,12 +200,183 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         }
     }
 
-@app.get("/api/v1/auth/me")
-def get_me(authorization: str = None, db: Session = Depends(get_db)):
-    """Devuelve los permisos frescos del usuario identificado por su JWT. Útil para refrescar
-    permisos sin hacer logout, especialmente tras cambios en RBAC."""
-    from fastapi import Request
-    return {"error": "use /auth/me-by-cedula"}
+class ProfileUpdate(BaseModel):
+    nombres: str
+    apellidos: str
+    email: Optional[str] = None
+    current_password: Optional[str] = None
+    new_password: Optional[str] = None
+
+@app.patch("/api/v1/auth/profile/{cedula}")
+def update_profile(cedula: str, data: ProfileUpdate, db: Session = Depends(get_db)):
+    """Actualiza nombre, correo y/o contraseña del usuario autenticado."""
+    emp = db.query(models.Empleado).filter(models.Empleado.identificacion == cedula).first()
+    if not emp:
+        raise HTTPException(status_code=404, detail="Empleado no encontrado")
+    # Verificar contraseña actual si se quiere cambiar la contraseña
+    if data.new_password:
+        if not data.current_password:
+            raise HTTPException(status_code=400, detail="Debes ingresar tu contraseña actual para cambiarla")
+        if not verify_password(data.current_password, emp.password_hash or ""):
+            raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta")
+        emp.password_hash = bcrypt.hashpw(data.new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    # Verificar email duplicado
+    if data.email and data.email != emp.email:
+        dup = db.query(models.Empleado).filter(
+            models.Empleado.email == data.email,
+            models.Empleado.id_empleado != emp.id_empleado
+        ).first()
+        if dup:
+            raise HTTPException(status_code=400, detail="Ese correo ya está en uso por otro colaborador")
+    emp.nombres = data.nombres
+    emp.apellidos = data.apellidos
+    if data.email:
+        emp.email = data.email
+    db.commit()
+    db.refresh(emp)
+    return {
+        "id": f"KW-{emp.id_empleado:03d}",
+        "name": f"{emp.nombres} {emp.apellidos}",
+        "email": emp.email,
+        "dni": emp.identificacion,
+    }
+
+# --- Backup / Restore ---
+
+@app.get("/api/v1/backup")
+def exportar_backup(db: Session = Depends(get_db)):
+    """Exporta toda la BD a JSON para respaldo."""
+    import json
+
+    agencias = db.query(models.Agencia).all()
+    roles = db.query(models.Rol).all()
+    permisos = db.query(models.Permiso).all()
+    empleados = db.query(models.Empleado).all()
+    areas = db.query(models.AreaRestringida).all()
+    dispositivos = db.query(models.DispositivoEscaneo).all()
+    bitacora = db.query(models.BitacoraAcceso).order_by(models.BitacoraAcceso.fecha_hora.desc()).limit(500).all()
+    alertas = db.query(models.AlertaSeguridad).order_by(models.AlertaSeguridad.fecha_generacion.desc()).limit(500).all()
+    roles_permisos_rows = db.execute(models.roles_permisos.select()).fetchall()
+
+    backup = {
+        "version": "1.0",
+        "generado_en": datetime.datetime.utcnow().isoformat() + "Z",
+        "agencias": [{"id_agencia": a.id_agencia, "nombre": a.nombre, "codigo": a.codigo, "direccion": a.direccion, "telefono": a.telefono, "tipo": a.tipo, "estado": a.estado} for a in agencias],
+        "permisos": [{"id_permiso": p.id_permiso, "codigo_permiso": p.codigo_permiso, "descripcion": p.descripcion} for p in permisos],
+        "roles": [{"id_rol": r.id_rol, "nombre": r.nombre, "descripcion": r.descripcion, "activo": r.activo} for r in roles],
+        "roles_permisos": [{"id_rol": row[0], "id_permiso": row[1]} for row in roles_permisos_rows],
+        "empleados": [{"id_empleado": e.id_empleado, "identificacion": e.identificacion, "nombres": e.nombres, "apellidos": e.apellidos, "email": e.email, "password_hash": e.password_hash, "estado_laboral": e.estado_laboral, "departamento": e.departamento, "id_agencia_base": e.id_agencia_base, "creado_en": e.creado_en.isoformat() if e.creado_en else None, "roles": [r.id_rol for r in e.roles]} for e in empleados],
+        "areas_restringidas": [{"id_area": a.id_area, "id_agencia": a.id_agencia, "nombre": a.nombre, "nivel_riesgo": a.nivel_riesgo, "id_permiso_requerido": a.id_permiso_requerido, "estado": a.estado, "horario": a.horario} for a in areas],
+        "dispositivos": [{"id_dispositivo": d.id_dispositivo, "id_area": d.id_area, "identificador_equipo": d.identificador_equipo, "mac_address": d.mac_address, "ip_address": d.ip_address, "estado": d.estado} for d in dispositivos],
+        "bitacora": [{"id_bitacora": b.id_bitacora, "id_empleado": b.id_empleado, "id_area": b.id_area, "id_dispositivo": b.id_dispositivo, "fecha_hora": utc_iso(b.fecha_hora), "tipo_movimiento": b.tipo_movimiento, "resultado": b.resultado, "motivo": b.motivo} for b in bitacora],
+        "alertas": [{"id_alerta": a.id_alerta, "id_bitacora_asociada": a.id_bitacora_asociada, "tipo_alerta": a.tipo_alerta, "estado": a.estado, "fecha_generacion": utc_iso(a.fecha_generacion)} for a in alertas],
+    }
+    from fastapi.responses import JSONResponse
+    return JSONResponse(content=backup, headers={"Content-Disposition": f"attachment; filename=backup_kullki_{datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"})
+
+@app.post("/api/v1/restore")
+async def restaurar_backup(db: Session = Depends(get_db), file: bytes = None):
+    """Restaura la BD desde un archivo JSON de respaldo."""
+    from fastapi import UploadFile, File
+    return {"error": "use multipart endpoint"}
+
+from fastapi import UploadFile, File
+
+@app.post("/api/v1/restore/upload")
+async def restaurar_backup_upload(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """Recibe un archivo JSON de respaldo y restaura los datos."""
+    import json
+    try:
+        content = await file.read()
+        data = json.loads(content)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Archivo JSON inválido o corrupto")
+
+    if data.get("version") != "1.0":
+        raise HTTPException(status_code=400, detail="Versión de respaldo no compatible")
+
+    try:
+        # --- Limpiar en orden inverso de dependencias ---
+        db.execute(models.roles_permisos.delete())
+        db.query(models.AlertaSeguridad).delete()
+        db.query(models.BitacoraAcceso).delete()
+        db.query(models.DispositivoEscaneo).delete()
+        db.query(models.EmpleadoArea).delete()
+        for e in db.query(models.Empleado).all():
+            e.roles = []
+        db.flush()
+        db.query(models.Empleado).delete()
+        db.query(models.AreaRestringida).delete()
+        db.query(models.Rol).delete()
+        db.query(models.Permiso).delete()
+        db.query(models.Agencia).delete()
+        db.flush()
+
+        # --- Restaurar en orden de dependencias ---
+        for a in data.get("agencias", []):
+            db.add(models.Agencia(id_agencia=a["id_agencia"], nombre=a["nombre"], codigo=a.get("codigo"), direccion=a.get("direccion"), telefono=a.get("telefono"), tipo=a.get("tipo","Sucursal"), estado=a.get("estado", True)))
+        db.flush()
+
+        for p in data.get("permisos", []):
+            db.add(models.Permiso(id_permiso=p["id_permiso"], codigo_permiso=p["codigo_permiso"], descripcion=p.get("descripcion")))
+        db.flush()
+
+        for r in data.get("roles", []):
+            db.add(models.Rol(id_rol=r["id_rol"], nombre=r["nombre"], descripcion=r.get("descripcion"), activo=r.get("activo", True)))
+        db.flush()
+
+        for rp in data.get("roles_permisos", []):
+            db.execute(models.roles_permisos.insert().values(id_rol=rp["id_rol"], id_permiso=rp["id_permiso"]))
+        db.flush()
+
+        for e in data.get("empleados", []):
+            emp = models.Empleado(
+                id_empleado=e["id_empleado"], identificacion=e["identificacion"],
+                nombres=e["nombres"], apellidos=e["apellidos"], email=e.get("email"),
+                password_hash=e.get("password_hash"), estado_laboral=e.get("estado_laboral","ACTIVO"),
+                departamento=e.get("departamento"), id_agencia_base=e.get("id_agencia_base"),
+                creado_en=datetime.datetime.fromisoformat(e["creado_en"].replace("Z","")) if e.get("creado_en") else datetime.datetime.utcnow()
+            )
+            db.add(emp)
+            db.flush()
+            if e.get("roles"):
+                roles_obj = db.query(models.Rol).filter(models.Rol.id_rol.in_(e["roles"])).all()
+                emp.roles = roles_obj
+        db.flush()
+
+        for a in data.get("areas_restringidas", []):
+            db.add(models.AreaRestringida(id_area=a["id_area"], id_agencia=a.get("id_agencia"), nombre=a["nombre"], nivel_riesgo=a["nivel_riesgo"], id_permiso_requerido=a.get("id_permiso_requerido"), estado=a.get("estado",True), horario=a.get("horario","08:00-18:00")))
+        db.flush()
+
+        for d in data.get("dispositivos", []):
+            db.add(models.DispositivoEscaneo(id_dispositivo=d["id_dispositivo"], id_area=d.get("id_area"), identificador_equipo=d["identificador_equipo"], mac_address=d.get("mac_address"), ip_address=d.get("ip_address"), estado=d.get("estado",True)))
+        db.flush()
+
+        for b in data.get("bitacora", []):
+            db.add(models.BitacoraAcceso(id_bitacora=b["id_bitacora"], id_empleado=b.get("id_empleado"), id_area=b.get("id_area"), id_dispositivo=b.get("id_dispositivo"), fecha_hora=datetime.datetime.fromisoformat(b["fecha_hora"].replace("Z","")) if b.get("fecha_hora") else datetime.datetime.utcnow(), tipo_movimiento=b.get("tipo_movimiento","IN"), resultado=b["resultado"], motivo=b.get("motivo")))
+        db.flush()
+
+        for al in data.get("alertas", []):
+            db.add(models.AlertaSeguridad(id_alerta=al["id_alerta"], id_bitacora_asociada=al.get("id_bitacora_asociada"), tipo_alerta=al["tipo_alerta"], estado=al.get("estado","ABIERTA"), fecha_generacion=datetime.datetime.fromisoformat(al["fecha_generacion"].replace("Z","")) if al.get("fecha_generacion") else datetime.datetime.utcnow()))
+        db.flush()
+
+        db.commit()
+
+        # Restablecer secuencias de autoincremento
+        db.execute(sa_text("SELECT setval('agencias_id_agencia_seq', (SELECT MAX(id_agencia) FROM agencias))"))
+        db.execute(sa_text("SELECT setval('permisos_id_permiso_seq', (SELECT MAX(id_permiso) FROM permisos))"))
+        db.execute(sa_text("SELECT setval('roles_id_rol_seq', (SELECT MAX(id_rol) FROM roles))"))
+        db.execute(sa_text("SELECT setval('empleados_id_empleado_seq', (SELECT MAX(id_empleado) FROM empleados))"))
+        db.execute(sa_text("SELECT setval('areas_restringidas_id_area_seq', (SELECT MAX(id_area) FROM areas_restringidas))"))
+        db.execute(sa_text("SELECT setval('dispositivos_escaneo_id_dispositivo_seq', (SELECT MAX(id_dispositivo) FROM dispositivos_escaneo))"))
+        db.execute(sa_text("SELECT setval('bitacora_accesos_id_bitacora_seq', (SELECT MAX(id_bitacora) FROM bitacora_accesos))"))
+        db.execute(sa_text("SELECT setval('alertas_seguridad_id_alerta_seq', (SELECT MAX(id_alerta) FROM alertas_seguridad))"))
+        db.commit()
+
+        return {"ok": True, "message": "Sistema restaurado correctamente"}
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error durante la restauración: {str(ex)}")
 
 @app.get("/api/v1/auth/permissions/{cedula}")
 def get_permissions_by_cedula(cedula: str, db: Session = Depends(get_db)):
