@@ -50,6 +50,118 @@ const Employees = () => {
 
   const fireSwal = (opts) => Swal.fire({ background: '#0d1424', color: '#f1f5f9', ...opts });
 
+  // Parsea "YYYY-MM-DD" como fecha LOCAL para evitar el desfase UTC que retrocede 1 día
+  const parseLocalDate = (dateStr) => {
+    if (!dateStr) return null;
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  };
+
+  const handlePrint = (emp) => {
+    // Obtener el SVG del QR ya renderizado en el DOM y serializarlo
+    const svgEl = document.querySelector('.print-area svg');
+    let svgString = '';
+    if (svgEl) {
+      if (!svgEl.getAttribute('xmlns')) svgEl.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      svgString = new XMLSerializer().serializeToString(svgEl);
+    }
+
+    const isActive    = emp.status === 'Activo';
+    const emissionDate = emp.hireDate
+      ? parseLocalDate(emp.hireDate).toLocaleDateString('es-EC')
+      : 'N/A';
+
+    const win = window.open('', '_blank', 'width=520,height=700');
+    win.document.write(`<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Credencial QR — ${emp.name}</title>
+  <style>
+    @page { size: A6 portrait; margin: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      background: #fff;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .card {
+      width: 290px;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 24px 20px;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 14px;
+      background: #fff;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+    .header { display: flex; align-items: center; gap: 8px; width: 100%; }
+    .logo { width: 28px; height: 28px; border-radius: 6px; object-fit: cover; border: 1px solid #f1f5f9; }
+    .brand-name { font-size: 9px; font-weight: 900; color: #79ac34; letter-spacing: .12em; text-transform: uppercase; line-height: 1; }
+    .brand-sub  { font-size: 7px; color: #94a3b8; text-transform: uppercase; margin-top: 2px; }
+    .qr-wrap {
+      padding: 12px; background: #fff;
+      border-radius: 10px;
+      border: 1px solid #f1f5f9;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+    }
+    .emp-name { font-size: 15px; font-weight: 700; color: #1e293b; text-align: center; }
+    .emp-dept { font-size: 11px; color: #64748b; margin-top: 3px; text-align: center; }
+    .emp-id {
+      display: inline-block; margin-top: 6px;
+      font-size: 8px; font-family: monospace; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .05em;
+      background: #f8fafc; color: #79ac34;
+      border: 1px solid #e2e8f0; border-radius: 4px;
+      padding: 2px 10px;
+    }
+    .meta { width: 100%; display: flex; flex-direction: column; gap: 5px; }
+    .meta-row { display: flex; justify-content: space-between; font-size: 8px; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; }
+    .meta-row .val { font-weight: 700; color: #334155; }
+    .status-active   { color: #8DC63F !important; }
+    .status-inactive { color: #ef4444 !important; }
+    .qr-text {
+      font-size: 7px; color: #94a3b8; font-family: monospace;
+      word-break: break-all; text-align: center; width: 100%;
+      border-top: 1px solid #f1f5f9; padding-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <img class="logo" src="https://play-lh.googleusercontent.com/G-uc06_SBqaE8a-M7JKQCD-Hpfkvxb1g9X3VPmyngldtTRS-pr69QPW_4zDBe9_6qEw" alt="Logo" />
+      <div>
+        <div class="brand-name">KULLKI WASI</div>
+        <div class="brand-sub">Credencial de Acceso</div>
+      </div>
+    </div>
+    <div class="qr-wrap">${svgString}</div>
+    <div style="text-align:center">
+      <div class="emp-name">${emp.name}</div>
+      <div class="emp-dept">${emp.department}</div>
+      <span class="emp-id">${emp.id}</span>
+    </div>
+    <div class="meta">
+      <div class="meta-row"><span>Emisión:</span><span class="val">${emissionDate}</span></div>
+      <div class="meta-row">
+        <span>Estado:</span>
+        <span class="val ${isActive ? 'status-active' : 'status-inactive'}">${emp.status?.toUpperCase()}</span>
+      </div>
+    </div>
+    <div class="qr-text">${emp.qrCode}</div>
+  </div>
+</body>
+</html>`);
+    win.document.close();
+    win.focus();
+    // Pequeño delay para que el logo cargue antes de imprimir
+    setTimeout(() => { win.print(); win.close(); }, 700);
+  };
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -430,7 +542,7 @@ const Employees = () => {
                 <div className="w-full text-center space-y-1">
                   <div className="flex justify-between items-center text-[8px] uppercase tracking-wider text-slate-500">
                     <span>Emisión:</span>
-                    <span className="font-bold text-slate-700">{qrEmployee.hireDate ? new Date(qrEmployee.hireDate).toLocaleDateString('es-EC') : 'N/A'}</span>
+                    <span className="font-bold text-slate-700">{qrEmployee.hireDate ? parseLocalDate(qrEmployee.hireDate).toLocaleDateString('es-EC') : 'N/A'}</span>
                   </div>
                   <div className="flex justify-between items-center text-[8px] uppercase tracking-wider text-slate-500">
                     <span>Estado:</span>
@@ -441,7 +553,7 @@ const Employees = () => {
                   <p className="text-[8px] text-slate-400 font-mono break-all">{qrEmployee.qrCode}</p>
                 </div>
               </div>
-              <button onClick={() => window.print()} className="btn-secondary w-full justify-center">
+              <button onClick={() => handlePrint(qrEmployee)} className="btn-secondary w-full justify-center">
                 <MdPrint size={16} className="text-[#8DC63F]" />
                 Imprimir Credencial
               </button>

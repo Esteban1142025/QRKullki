@@ -433,23 +433,32 @@ textarea::placeholder {
    PRINT STYLES (Credentials)
 ============================================= */
 @media print {
-  body * {
-    visibility: hidden;
+  /* Ocultar todo el layout con display:none para no generar páginas en blanco */
+  body > * {
+    display: none !important;
   }
-  .print-area, .print-area * {
-    visibility: visible;
-  }
+  /* Mostrar solo el área marcada para impresión */
   .print-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 20px;
+    display: block !important;
+    position: fixed !important;
+    top: 0; left: 0;
+    width: 100%; height: auto;
+    margin: 0; padding: 20px;
+    background: white !important;
     box-shadow: none !important;
     border: none !important;
+    page-break-after: avoid;
+    page-break-inside: avoid;
+  }
+  .print-area * {
+    display: revert !important;
+    visibility: visible !important;
   }
   .no-print {
     display: none !important;
+  }
+  @page {
+    margin: 1cm;
+    size: auto;
   }
 }
