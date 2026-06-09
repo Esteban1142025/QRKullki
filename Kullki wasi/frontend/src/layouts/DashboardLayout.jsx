@@ -300,9 +300,11 @@ const DashboardLayout = () => {
                         <div className="p-5 text-center text-xs text-slate-400 font-medium">Sin alertas recientes</div>
                       )}
                     </div>
-                    <Link to="/security" onClick={() => setShowNotifications(false)} className="block px-4 py-2.5 text-center text-[11px] font-black text-[#79ac34] hover:text-[#6aa832] bg-slate-50 transition-colors">
-                      Ver todas las alertas →
-                    </Link>
+                    {['admin', 'riesgos', 'seguridad_fisica'].includes(user?.role) && (
+                      <Link to="/security" onClick={() => setShowNotifications(false)} className="block px-4 py-2.5 text-center text-[11px] font-black text-[#79ac34] hover:text-[#6aa832] bg-slate-50 transition-colors">
+                        Ver todas las alertas →
+                      </Link>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
