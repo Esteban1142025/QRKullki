@@ -1,55 +1,79 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { EMPLOYEES, AREAS, QR_DEVICES, ROLES } from '../data/mockData';
+import apiClient from '../services/api/apiClient';
 import Swal from 'sweetalert2';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   MdQrCodeScanner, MdCheckCircle, MdCancel, MdDevices,
-  MdArrowForward, MdPlayCircleFilled, MdWifiTethering
+  MdArrowForward, MdPlayCircleFilled, MdWifiTethering, MdRefresh
 } from 'react-icons/md';
-
-// Map device area names → AREAS array id
-const DEVICE_AREA_MAP = {
-  'Bóveda Principal':              'BOV',
-  'Cuarto de Servidores TI':       'SRV',
-  'Área de Cajas':                 'CAJ',
-  'Archivo General e Histórico':   'ARC',
-};
 
 const QRScanner = () => {
   const { user } = useAuth();
-  const [selectedDeviceId, setSelectedDeviceId] = useState(QR_DEVICES[0].id);
-  const [scannedQR, setScannedQR]               = useState('');
-  const [selectedEmpId, setSelectedEmpId]       = useState(EMPLOYEES[0].id);
-  const [validationResult, setValidationResult] = useState(null);
-  const [employees, setEmployees]               = useState(EMPLOYEES);
 
-  useEffect(() => {
+  const [employees, setEmployees] = useState([]);
+  const [devices, setDevices]     = useState([]);
+  const [areas, setAreas]         = useState([]);
+  const [loading, setLoading]     = useState(true);
+
+  const [selectedDeviceId, setSelectedDeviceId] = useState('');
+  const [selectedEmpId, setSelectedEmpId]       = useState('');
+  const [scannedQR, setScannedQR]               = useState('');
+  const [validationResult, setValidationResult] = useState(null);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
     try {
-      const raw = localStorage.getItem('kw_dynamic_employees');
-      if (raw) setEmployees(JSON.parse(raw));
-    } catch (_) {}
+      const [empRes, devRes, areaRes] = await Promise.all([
+        apiClient.get('/empleados'),
+        apiClient.get('/dispositivos'),
+        apiClient.get('/areas'),
+      ]);
+      setEmployees(empRes.data);
+      setDevices(devRes.data);
+      setAreas(areaRes.data);
+      if (devRes.data.length > 0) setSelectedDeviceId(devRes.data[0].id);
+      if (empRes.data.length > 0) setSelectedEmpId(empRes.data[0].id);
+    } catch (err) {
+      console.error('Error al cargar datos del simulador:', err);
+      Swal.fire({ icon: 'error', title: 'Error de conexión', text: 'No se pudo cargar los datos del simulador.' });
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const device  = QR_DEVICES.find(d => d.id === selectedDeviceId) ?? QR_DEVICES[0];
-  const areaId  = DEVICE_AREA_MAP[device.area] ?? 'ADM';
-  const area    = AREAS.find(a => a.id === areaId) ?? AREAS[AREAS.length - 1];
+  useEffect(() => { loadData(); }, [loadData]);
 
-  // ── Validation logic ─────────────────────────────────
-  const validate = (qrString) => {
-    if (!qrString.trim()) {
-      Swal.fire({ icon: 'warning', title: 'Entrada Vacía', text: 'Ingrese o seleccione un código QR.',
+  // Dispositivo activo
+  const device = devices.find(d => d.id === selectedDeviceId) ?? devices[0];
+
+  // Área del dispositivo activo (match por nombre)
+  const area = device
+    ? areas.find(a => a.name === device.area) ?? areas[0]
+    : null;
+
+  // ── Lógica de validación ────────────────────────────────
+  const validate = (qrString, preFoundEmp = null) => {
+    if (!qrString?.trim()) {
+      Swal.fire({ icon: 'warning', title: 'Entrada Vacía',
+        text: 'Ingrese o seleccione un código QR.',
+        background: '#ffffff', color: '#1e293b' });
+      return;
+    }
+    if (!device || device.status !== 'Online') {
+      Swal.fire({ icon: 'error', title: 'Terminal Offline',
+        text: 'Este terminal se encuentra desconectado. No puede procesar accesos.',
+        background: '#ffffff', color: '#1e293b' });
+      return;
+    }
+    if (!area) {
+      Swal.fire({ icon: 'error', title: 'Sin Área',
+        text: 'El terminal no tiene un área asignada.',
         background: '#ffffff', color: '#1e293b' });
       return;
     }
 
-    if (device.status !== 'Online') {
-      Swal.fire({ icon: 'error', title: 'Terminal Offline', text: 'Este terminal se encuentra desconectado. No puede procesar accesos.',
-        background: '#ffffff', color: '#1e293b' });
-      return;
-    }
-
-    const emp = employees.find(e => e.qrCode === qrString);
+    const emp = preFoundEmp || employees.find(e => e.qrCode === qrString);
 
     if (!emp) {
       record(false, 'Código QR no registrado en la institución.', null, qrString);
@@ -60,81 +84,94 @@ const QRScanner = () => {
       return;
     }
 
-    const roleOk = area.allowedRoles.includes('all')
-      || area.allowedRoles.includes(emp.role)
+    const allowedRoles = area.allowedRoles || [];
+    const roleOk = allowedRoles.includes('all')
+      || allowedRoles.includes(emp.role)
       || emp.role === 'admin';
 
     if (!roleOk) {
-      const roleName = ROLES[emp.role]?.name ?? emp.role;
-      record(false, `El perfil '${roleName}' no tiene privilegios de ingreso a '${area.name}'.`, emp, qrString);
+      record(false, `El perfil '${emp.role}' no tiene privilegios de ingreso a '${area.name}'.`, emp, qrString);
       return;
     }
 
     if (area.schedule && area.schedule !== '24/7') {
-      const parts   = area.schedule.split(' - ');
-      const [sh, sm] = parts[0].split(':').map(Number);
-      const [eh, em] = parts[1].split(':').map(Number);
-      const now = new Date();
-      const cur = now.getHours() * 60 + now.getMinutes();
-      const start = sh * 60 + sm;
-      const end   = eh * 60 + em;
-      if (cur < start || cur >= end) {
-        record(false, `Acceso fuera del horario permitido para esta área (${area.schedule}).`, emp, qrString);
-        return;
+      const parts = area.schedule.split(' - ');
+      if (parts.length === 2) {
+        const [sh, sm] = parts[0].split(':').map(Number);
+        const [eh, em] = parts[1].split(':').map(Number);
+        const now = new Date();
+        const cur = now.getHours() * 60 + now.getMinutes();
+        const start = sh * 60 + sm;
+        const end   = eh * 60 + em;
+        if (cur < start || cur >= end) {
+          record(false, `Acceso fuera del horario permitido para esta área (${area.schedule}).`, emp, qrString);
+          return;
+        }
       }
     }
 
     record(true, 'Acceso autorizado exitosamente. Bienvenido.', emp, qrString);
   };
 
-  const record = (allowed, reason, emp, qrString) => {
+  const record = async (allowed, reason, emp, _qrString) => {
     const ts = new Date().toISOString();
-    const unknown = { name: 'Credencial Desconocida', id: 'KW-UNK', role: '—', department: '—',
-      photo: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100' };
-
+    const unknown = { name: 'Credencial Desconocida', id: 'KW-UNK', department: '—' };
     setValidationResult({ allowed, reason, timestamp: ts, employee: emp ?? unknown });
 
-    // Persist log
-    const log = {
-      id: `LOG-${Date.now()}`, timestamp: ts,
-      employeeId: emp?.id ?? 'KW-DESCONOCIDO',
-      name: emp?.name ?? 'Credencial Desconocida',
-      role: emp?.role ?? 'desconocido',
-      agency: device.agency, area: area.name, device: device.name,
-      status: allowed ? 'Autorizado' : 'Denegado',
-      details: reason,
-      risk: allowed ? 'Bajo' : (reason.includes('no registrado') || reason.includes('INACTIVO') ? 'Alto' : 'Medio'),
-    };
-    const logs = JSON.parse(localStorage.getItem('kw_dynamic_logs') || '[]');
-    localStorage.setItem('kw_dynamic_logs', JSON.stringify([log, ...logs]));
-
-    if (!allowed) {
-      const alert = {
-        id: `ALT-${Date.now()}`, timestamp: ts,
-        type: emp ? (emp.status !== 'Activo' ? 'Credencial Bloqueada' : 'Acceso No Autorizado') : 'QR Desconocido/Falsificado',
-        severity: emp ? (emp.status !== 'Activo' ? 'Alta' : 'Crítica') : 'Crítica',
-        area: area.name,
-        agency: device.agency === 'MAT' ? 'Matriz Ambato' : `Agencia (${device.agency})`,
-        details: `Denegación en ${device.name}: ${reason}`,
-        status: 'Pendiente', responsibleUserId: null, history: [{ date: ts, user: 'Sistema', action: 'Alerta generada' }]
-      };
-      const alerts = JSON.parse(localStorage.getItem('kw_dynamic_alerts') || '[]');
-      localStorage.setItem('kw_dynamic_alerts', JSON.stringify([alert, ...alerts]));
+    // Registrar en la base de datos
+    try {
+      await apiClient.post('/scan/simulate', {
+        id_empleado: emp?.id_empleado ?? null,
+        id_dispositivo: device?.id_dispositivo ?? null,
+        resultado: allowed ? 'CONCEDIDO' : 'DENEGADO',
+        motivo: reason,
+      });
+    } catch (err) {
+      console.error('Error al registrar escaneo en DB:', err);
     }
   };
 
   const handleScanEmployee = () => {
     const emp = employees.find(e => e.id === selectedEmpId);
-    if (emp) { setScannedQR(emp.qrCode); validate(emp.qrCode); }
+    if (emp) { setScannedQR(emp.qrCode); validate(emp.qrCode, emp); }
   };
 
   const reset = () => { setValidationResult(null); setScannedQR(''); };
 
+  // ── Loading ─────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 border-4 border-[#8DC63F] border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-slate-500 text-sm font-medium">Cargando terminal QR...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (devices.length === 0) {
+    return (
+      <div className="p-10 text-center text-slate-500 text-sm border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+        <MdDevices size={36} className="mx-auto mb-3 text-slate-300" />
+        <p className="font-semibold">No hay dispositivos registrados en la base de datos.</p>
+        <button onClick={loadData} className="mt-4 btn-primary text-xs">
+          <MdRefresh size={14} /> Reintentar
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-black text-slate-800 font-['Outfit']">Simulador de Garita y Control QR</h2>
-        <p className="text-xs text-slate-500 mt-0.5">Emule el comportamiento de los lectores físicos instalados en torniquetes y exclusas de seguridad.</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-xl font-black text-slate-800 font-['Outfit']">Simulador de Garita y Control QR</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Emule el comportamiento de los lectores físicos instalados en torniquetes y exclusas de seguridad.</p>
+        </div>
+        <button onClick={loadData} className="btn-icon" title="Actualizar datos">
+          <MdRefresh size={18} />
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -153,32 +190,35 @@ const QRScanner = () => {
               onChange={e => { setSelectedDeviceId(e.target.value); reset(); }}
               className="w-full"
             >
-              {QR_DEVICES.map(d => (
+              {devices.map(d => (
                 <option key={d.id} value={d.id}>{d.name} — {d.status}</option>
               ))}
             </select>
           </div>
 
           {/* Device info */}
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5 text-xs">
-            {[
-              ['Área de Cobertura', area.name],
-              ['Nivel de Riesgo', area.riskLevel],
-              ['Horario Activo', area.schedule],
-              ['IP Terminal', device.ip],
-              ['Estado Conexión', device.status],
-            ].map(([k, v]) => (
-              <div key={k} className="flex justify-between">
-                <span className="text-slate-500">{k}:</span>
-                <span className={`font-semibold ${
-                  k === 'Nivel de Riesgo' ? (v === 'Crítico' ? 'text-red-500' : v === 'Alto' ? 'text-orange-500' : 'text-slate-700')
-                  : k === 'Horario Activo' ? 'text-[#79ac34]'
-                  : k === 'Estado Conexión' ? (v === 'Online' ? 'text-emerald-500' : 'text-red-500')
-                  : 'text-slate-700'
-                }`}>{v}</span>
-              </div>
-            ))}
-          </div>
+          {device && area && (
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5 text-xs">
+              {[
+                ['Área de Cobertura', area.name],
+                ['Nivel de Riesgo',   area.riskLevel],
+                ['Horario Activo',    area.schedule],
+                ['IP Terminal',       device.ip],
+                ['Estado Conexión',   device.status],
+              ].map(([k, v]) => (
+                <div key={k} className="flex justify-between">
+                  <span className="text-slate-500">{k}:</span>
+                  <span className={`font-semibold ${
+                    k === 'Nivel de Riesgo'
+                      ? (v === 'Crítico' ? 'text-red-500' : v === 'Alto' ? 'text-orange-500' : 'text-slate-700')
+                      : k === 'Horario Activo'    ? 'text-[#79ac34]'
+                      : k === 'Estado Conexión'   ? (v === 'Online' ? 'text-emerald-500' : 'text-red-500')
+                      : 'text-slate-700'
+                  }`}>{v}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Credential injection */}
           <div className="space-y-3.5 pt-1">
@@ -188,7 +228,11 @@ const QRScanner = () => {
             <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-2 shadow-sm">
               <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Método A — Empleado Registrado</span>
               <div className="flex gap-2">
-                <select value={selectedEmpId} onChange={e => setSelectedEmpId(e.target.value)} className="flex-1 text-[11px] bg-slate-50">
+                <select
+                  value={selectedEmpId}
+                  onChange={e => setSelectedEmpId(e.target.value)}
+                  className="flex-1 text-[11px] bg-slate-50"
+                >
                   {employees.map(e => (
                     <option key={e.id} value={e.id}>{e.name} ({e.status})</option>
                   ))}
@@ -228,7 +272,6 @@ const QRScanner = () => {
         {/* ── RIGHT: Turnstile display ──────────────── */}
         <div className="lg:col-span-7 flex flex-col items-center justify-center p-6 rounded-2xl glass-panel min-h-[420px] relative overflow-hidden">
 
-          {/* bg glow */}
           <div className="absolute inset-0 bg-gradient-radial from-slate-200/50 via-transparent to-transparent pointer-events-none" />
 
           <AnimatePresence mode="wait">
@@ -252,7 +295,9 @@ const QRScanner = () => {
                 </div>
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg shadow-sm">
                   <MdWifiTethering size={14} className="text-[#8DC63F] animate-pulse" />
-                  <span className="text-[10px] text-[#79ac34] font-mono font-bold tracking-wider">LISTENING · {device.ip}</span>
+                  <span className="text-[10px] text-[#79ac34] font-mono font-bold tracking-wider">
+                    LISTENING · {device?.ip || '—'}
+                  </span>
                 </div>
               </motion.div>
 
@@ -327,7 +372,7 @@ const QRScanner = () => {
 
                   <div className="w-full mt-4 flex items-center justify-center gap-1.5 border-t border-slate-100 pt-3">
                     <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping" />
-                    <span className="text-[10px] text-red-500 font-bold">Alerta enviada al Oficial de Riesgos</span>
+                    <span className="text-[10px] text-red-500 font-bold">Alerta registrada en el sistema</span>
                   </div>
                 </div>
               </motion.div>

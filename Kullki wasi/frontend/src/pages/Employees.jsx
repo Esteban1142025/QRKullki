@@ -1,6 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ROLES } from '../data/mockData';
+// Metadatos visuales de roles (constantes de UI, no datos de negocio)
+const ROLES = {
+  admin:            { name: 'Administrador',    badgeColor: 'bg-red-500/20 text-red-400 border-red-500/30' },
+  talento_humano:   { name: 'Talento Humano',   badgeColor: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
+  riesgos:          { name: 'Oficial Riesgos',  badgeColor: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
+  seguridad_fisica: { name: 'Seguridad Física', badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
+  auditor:          { name: 'Auditor',          badgeColor: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
+  jefe_agencia:     { name: 'Jefe Agencia',     badgeColor: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' },
+  tecnico_ti:       { name: 'Técnico TI',       badgeColor: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
+  empleado:         { name: 'Empleado',         badgeColor: 'bg-slate-500/20 text-slate-400 border-slate-500/30' },
+};
 import apiClient from '../services/api/apiClient';
 import { QRCodeSVG } from 'qrcode.react';
 import Swal from 'sweetalert2';

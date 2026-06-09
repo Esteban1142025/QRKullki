@@ -95,6 +95,7 @@ class DispositivoEscaneo(Base):
     id_area = Column(BigInteger, ForeignKey("areas_restringidas.id_area", ondelete="SET NULL"), nullable=True)
     identificador_equipo = Column(String(100), unique=True, nullable=False)
     mac_address = Column(String(50), nullable=True)
+    ip_address = Column(String(50), nullable=True)
     estado = Column(Boolean, default=True)
     ultima_sincronizacion = Column(DateTime, nullable=True)
 

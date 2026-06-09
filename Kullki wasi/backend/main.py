@@ -338,7 +338,20 @@ def listar_areas(db: Session = Depends(get_db)):
     areas = db.query(models.AreaRestringida).all()
     result = []
     for a in areas:
-        permiso_nombre = a.permiso_requerido.codigo_permiso if a.permiso_requerido else None
+        # Calcular allowedRoles: roles que tienen el permiso requerido del área
+        if a.id_permiso_requerido:
+            roles_con_permiso = db.query(models.Rol).join(
+                models.roles_permisos,
+                models.Rol.id_rol == models.roles_permisos.c.id_rol
+            ).filter(
+                models.roles_permisos.c.id_permiso == a.id_permiso_requerido
+            ).all()
+            allowed = [r.nombre for r in roles_con_permiso]
+            if "admin" not in allowed:
+                allowed.append("admin")
+        else:
+            allowed = ["all"]
+
         result.append({
             "id": f"AR-{a.id_area}",
             "id_area": a.id_area,
@@ -346,7 +359,7 @@ def listar_areas(db: Session = Depends(get_db)):
             "riskLevel": a.nivel_riesgo,
             "status": "Protegido" if a.estado else "Inactivo",
             "schedule": a.horario or "08:00 - 18:00",
-            "permiso_requerido": permiso_nombre,
+            "allowedRoles": allowed,
         })
     return result
 
@@ -375,6 +388,31 @@ def listar_roles(db: Session = Depends(get_db)):
         "active": r.activo,
         "permissions": [p.codigo_permiso for p in r.permisos]
     } for r in roles]
+
+@app.put("/api/v1/roles/{id_rol}")
+def actualizar_rol(id_rol: int, data: dict, db: Session = Depends(get_db)):
+    rol = db.query(models.Rol).filter(models.Rol.id_rol == id_rol).first()
+    if not rol:
+        raise HTTPException(status_code=404, detail="Rol no encontrado")
+    permisos_codigos = data.get("permissions", [])
+    # Buscar permisos existentes
+    permisos = db.query(models.Permiso).filter(models.Permiso.codigo_permiso.in_(permisos_codigos)).all()
+    # Crear permisos faltantes
+    existing_codes = {p.codigo_permiso for p in permisos}
+    for code in permisos_codigos:
+        if code not in existing_codes:
+            nuevo = models.Permiso(codigo_permiso=code, descripcion=code)
+            db.add(nuevo)
+            db.flush()
+            permisos.append(nuevo)
+    rol.permisos = permisos
+    db.commit()
+    db.refresh(rol)
+    return {
+        "id": rol.id_rol,
+        "name": rol.nombre,
+        "permissions": [p.codigo_permiso for p in rol.permisos]
+    }
 
 # --- Bitácora / Logs ---
 
@@ -445,16 +483,67 @@ def actualizar_alerta(id_alerta: int, data: dict, db: Session = Depends(get_db))
 @app.get("/api/v1/dispositivos")
 def listar_dispositivos(db: Session = Depends(get_db)):
     devs = db.query(models.DispositivoEscaneo).all()
-    return [{
-        "id": f"DEV-{d.id_dispositivo:02d}",
-        "id_dispositivo": d.id_dispositivo,
-        "name": d.identificador_equipo,
-        "type": "Lector QR",
-        "area": d.area.nombre if d.area else "Sin área",
-        "status": "Online" if d.estado else "Offline",
-        "lastPulse": d.ultima_sincronizacion.isoformat() if d.ultima_sincronizacion else None,
-        "mac": d.mac_address or "",
-    } for d in devs]
+    result = []
+    for d in devs:
+        area_nombre = d.area.nombre if d.area else "Sin área"
+        # Derivar agencia del área
+        agency = "MAT"
+        if d.area and d.area.id_agencia:
+            ag = db.query(models.Agencia).filter(models.Agencia.id_agencia == d.area.id_agencia).first()
+            if ag:
+                agency = ag.codigo or "MAT"
+        result.append({
+            "id": f"DEV-{d.id_dispositivo:02d}",
+            "id_dispositivo": d.id_dispositivo,
+            "name": d.identificador_equipo,
+            "type": "Lector QR",
+            "area": area_nombre,
+            "agency": agency,
+            "ip": d.ip_address or f"192.168.10.{20 + d.id_dispositivo}",
+            "status": "Online" if d.estado else "Offline",
+            "lastPulse": d.ultima_sincronizacion.isoformat() if d.ultima_sincronizacion else None,
+            "mac": d.mac_address or "",
+        })
+    return result
+
+@app.post("/api/v1/scan/simulate")
+def simular_escaneo(data: dict, db: Session = Depends(get_db)):
+    """Endpoint para el simulador QR del frontend — graba en BitacoraAcceso y AlertaSeguridad."""
+    id_empleado = data.get("id_empleado")
+    id_dispositivo = data.get("id_dispositivo")
+    resultado = data.get("resultado", "DENEGADO")
+    motivo = data.get("motivo", "")
+
+    disp = db.query(models.DispositivoEscaneo).filter(
+        models.DispositivoEscaneo.id_dispositivo == id_dispositivo
+    ).first()
+    if not disp:
+        raise HTTPException(status_code=404, detail="Dispositivo no encontrado")
+
+    bitacora = models.BitacoraAcceso(
+        id_empleado=id_empleado,
+        id_area=disp.id_area,
+        id_dispositivo=id_dispositivo,
+        resultado=resultado,
+        motivo=motivo,
+    )
+    db.add(bitacora)
+    db.commit()
+    db.refresh(bitacora)
+
+    if resultado == "DENEGADO":
+        tipo = "Intento de Acceso Denegado (Simulador)"
+        if not id_empleado:
+            tipo = "QR Desconocido/Falsificado (Simulador)"
+        alerta = models.AlertaSeguridad(
+            id_bitacora_asociada=bitacora.id_bitacora,
+            tipo_alerta=tipo,
+        )
+        db.add(alerta)
+        db.commit()
+
+    return {"status": resultado, "id_bitacora": bitacora.id_bitacora}
+
 
 @app.post("/api/v1/scan")
 def registrar_escaneo(data: dict, db: Session = Depends(get_db)):

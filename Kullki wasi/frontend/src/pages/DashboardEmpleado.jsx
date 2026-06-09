@@ -1,15 +1,23 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { AREAS } from '../data/mockData';
+import apiClient from '../services/api/apiClient';
 import { MdCheckCircle, MdLockClock, MdShield } from 'react-icons/md';
 
 const DashboardEmpleado = () => {
   const { user } = useAuth();
+  const [areas, setAreas] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Filtrar áreas permitidas para este rol
+  useEffect(() => {
+    apiClient.get('/areas')
+      .then(res => setAreas(res.data))
+      .catch(err => console.error('Error al cargar áreas:', err))
+      .finally(() => setLoading(false));
+  }, []);
+
   const userRole = user?.role || 'empleado';
-  const assignedAreas = AREAS.filter(area => 
-    area.allowedRoles.includes('all') || area.allowedRoles.includes(userRole)
+  const assignedAreas = areas.filter(area =>
+    (area.allowedRoles || []).includes('all') || (area.allowedRoles || []).includes(userRole)
   );
 
   return (
@@ -31,7 +39,7 @@ const DashboardEmpleado = () => {
             </p>
           </div>
           <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-slate-200 shrink-0 shadow-sm">
-             <MdCheckCircle className="text-[#8DC63F]" size={16} />
+            <MdCheckCircle className="text-[#8DC63F]" size={16} />
             <span className="text-xs font-bold text-[#8DC63F] uppercase tracking-wide">Credencial Activa</span>
           </div>
         </div>
@@ -40,31 +48,44 @@ const DashboardEmpleado = () => {
       {/* ── ASSIGNED AREAS GRID ────────────────────── */}
       <div>
         <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-300 pb-2">
-          Áreas Asignadas ({assignedAreas.length})
+          Áreas Asignadas ({loading ? '…' : assignedAreas.length})
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {assignedAreas.map(area => (
-            <div key={area.id} className="p-5 rounded-2xl glass-panel border-2 border-transparent hover:border-[#8DC63F]/40 flex flex-col justify-between transition-all">
-              <div>
-                <div className="flex items-start justify-between mb-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#8DC63F]/15 flex items-center justify-center text-[#79ac34]">
-                    <MdShield size={20} />
+
+        {loading ? (
+          <div className="flex items-center justify-center h-32">
+            <div className="w-8 h-8 border-4 border-[#8DC63F] border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : assignedAreas.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {assignedAreas.map(area => (
+              <div key={area.id} className="p-5 rounded-2xl glass-panel border-2 border-transparent hover:border-[#8DC63F]/40 flex flex-col justify-between transition-all">
+                <div>
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-[#8DC63F]/15 flex items-center justify-center text-[#79ac34]">
+                      <MdShield size={20} />
+                    </div>
+                    <span className="inline-block px-2 py-1 rounded bg-emerald-50 text-emerald-600 border border-emerald-200 text-[9px] font-bold uppercase">
+                      Acceso Autorizado
+                    </span>
                   </div>
-                  <span className="inline-block px-2 py-1 rounded bg-emerald-50 text-emerald-600 border border-emerald-200 text-[9px] font-bold uppercase">
-                    Acceso Autorizado
-                  </span>
+                  <h4 className="text-lg font-black text-slate-800 font-['Outfit']">{area.name}</h4>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Nivel de Riesgo: {area.riskLevel}</p>
                 </div>
-                <h4 className="text-lg font-black text-slate-800 font-['Outfit']">{area.name}</h4>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Nivel de Riesgo: {area.riskLevel}</p>
+
+                <div className="mt-5 pt-4 border-t border-slate-200 flex items-center gap-2 text-slate-600">
+                  <MdLockClock size={16} className="text-[#79ac34]" />
+                  <span className="text-xs font-bold">Horario: {area.schedule}</span>
+                </div>
               </div>
-              
-              <div className="mt-5 pt-4 border-t border-slate-200 flex items-center gap-2 text-slate-600">
-                <MdLockClock size={16} className="text-[#79ac34]" />
-                <span className="text-xs font-bold">Horario: {area.schedule}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-10 text-center text-slate-500 border-2 border-dashed border-slate-200 rounded-2xl">
+            <MdShield size={32} className="mx-auto mb-3 text-slate-300" />
+            <p className="font-medium text-sm">No tienes áreas asignadas con tu rol actual.</p>
+            <p className="text-xs mt-1">Contacta a Talento Humano si crees que hay un error.</p>
+          </div>
+        )}
       </div>
 
       <div className="mt-8 text-center">

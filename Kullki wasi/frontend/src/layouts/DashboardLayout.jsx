@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ROLES } from '../data/mockData';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   MdDashboard,

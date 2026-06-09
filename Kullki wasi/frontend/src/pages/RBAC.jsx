@@ -1,20 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ROLES } from '../data/mockData';
+import apiClient from '../services/api/apiClient';
 import Swal from 'sweetalert2';
 import {
-  MdSecurity, MdCheckCircle, MdCancel, MdSave, MdInfoOutline, MdLockOpen, MdShield
+  MdSecurity, MdCheckCircle, MdCancel, MdSave, MdInfoOutline,
+  MdLockOpen, MdShield, MdRefresh
 } from 'react-icons/md';
 
+// Metadatos visuales de cada rol (no provienen de DB, son constantes de UI)
+const ROLE_DISPLAY = {
+  admin:           { displayName: 'Administrador General',    description: 'Acceso total y configuración del sistema' },
+  talento_humano:  { displayName: 'Talento Humano',           description: 'Gestión de empleados, permisos laborales y reportes' },
+  riesgos:         { displayName: 'Oficial de Riesgos',       description: 'Evaluación de bitácoras de seguridad e incidentes' },
+  seguridad_fisica:{ displayName: 'Seguridad Física',         description: 'Validación QR y control de garita' },
+  auditor:         { displayName: 'Auditor Interno',          description: 'Consulta de bitácoras y trazabilidad completa' },
+  jefe_agencia:    { displayName: 'Jefe de Agencia',          description: 'Administración local de sucursal y accesos temporales' },
+  tecnico_ti:      { displayName: 'Técnico TI',               description: 'Gestión técnica de dispositivos QR, red y servidores' },
+  empleado:        { displayName: 'Empleado',                 description: 'Consulta de permisos propios y descarga de credencial QR' },
+};
+
 const PERMISSIONS = [
-  { id: 'all',             label: 'Acceso Total (SuperAdmin)',     category: 'Sistema'   },
-  { id: 'read_employees',  label: 'Ver Colaboradores',             category: 'Personal'  },
-  { id: 'write_employees', label: 'Modificar Colaboradores',       category: 'Personal'  },
-  { id: 'read_logs',       label: 'Consultar Bitácoras',           category: 'Auditoría' },
-  { id: 'read_alerts',     label: 'Ver Alertas Críticas',          category: 'Seguridad' },
-  { id: 'write_security',  label: 'Resolver Incidentes',           category: 'Seguridad' },
-  { id: 'validate_qr',     label: 'Simular Escaneo QR',            category: 'Accesos'   },
-  { id: 'read_reports',    label: 'Generar Reportes PDF/XLS',      category: 'Auditoría' },
+  { id: 'all',             label: 'Acceso Total (SuperAdmin)',  category: 'Sistema'   },
+  { id: 'read_employees',  label: 'Ver Colaboradores',          category: 'Personal'  },
+  { id: 'write_employees', label: 'Modificar Colaboradores',    category: 'Personal'  },
+  { id: 'read_logs',       label: 'Consultar Bitácoras',        category: 'Auditoría' },
+  { id: 'read_alerts',     label: 'Ver Alertas Críticas',       category: 'Seguridad' },
+  { id: 'write_security',  label: 'Resolver Incidentes',        category: 'Seguridad' },
+  { id: 'validate_qr',     label: 'Simular Escaneo QR',         category: 'Accesos'   },
+  { id: 'read_reports',    label: 'Generar Reportes PDF/XLS',   category: 'Auditoría' },
+  { id: 'read_own_profile',label: 'Ver Perfil Propio',          category: 'Personal'  },
+  { id: 'read_own_qr',     label: 'Descargar Credencial QR',    category: 'Accesos'   },
+  { id: 'read_audit',      label: 'Acceso a Auditoría',         category: 'Auditoría' },
+  { id: 'acceso_total',    label: 'Acceso Total a Áreas',       category: 'Accesos'   },
 ];
 
 const CATEGORY_COLORS = {
@@ -27,53 +44,101 @@ const CATEGORY_COLORS = {
 
 const RBAC = () => {
   const { user } = useAuth();
-  const [rolesData, setRolesData] = useState(() => {
-    try {
-      const stored = localStorage.getItem('kw_dynamic_roles');
-      return stored ? JSON.parse(stored) : ROLES;
-    } catch { return ROLES; }
-  });
+  const [rolesData, setRolesData]       = useState({});  // { roleName: { id_rol, name, displayName, permissions: [] } }
   const [activeRoleId, setActiveRoleId] = useState('admin');
+  const [loading, setLoading]           = useState(true);
+  const [saving, setSaving]             = useState(false);
 
-  const saveRoles = (updated) => {
-    setRolesData(updated);
-    localStorage.setItem('kw_dynamic_roles', JSON.stringify(updated));
-  };
+  const loadRoles = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiClient.get('/roles');
+      const map = {};
+      res.data.forEach(r => {
+        const meta = ROLE_DISPLAY[r.name] || { displayName: r.name, description: r.description || '' };
+        map[r.name] = {
+          id:          r.name,
+          id_rol:      r.id,
+          name:        meta.displayName,
+          description: meta.description,
+          permissions: r.permissions || [],
+        };
+      });
+      setRolesData(map);
+      // Seleccionar el primer rol disponible si "admin" no existe
+      if (!map['admin'] && Object.keys(map).length > 0) {
+        setActiveRoleId(Object.keys(map)[0]);
+      }
+    } catch (err) {
+      console.error('Error al cargar roles:', err);
+      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo cargar la lista de roles.', background: '#ffffff', color: '#1e293b' });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadRoles(); }, [loadRoles]);
 
   const togglePermission = (roleId, permId) => {
     const role = rolesData[roleId];
+    if (!role) return;
     let perms = [...role.permissions];
 
     if (permId === 'all') {
       perms = perms.includes('all') ? [] : ['all'];
     } else {
       perms = perms.filter(p => p !== 'all');
-      perms = perms.includes(permId) ? perms.filter(p => p !== permId) : [...perms, permId];
+      perms = perms.includes(permId)
+        ? perms.filter(p => p !== permId)
+        : [...perms, permId];
     }
 
-    const updated = { ...rolesData, [roleId]: { ...role, permissions: perms } };
-    saveRoles(updated);
-
-    // Audit log
-    const log = {
-      id: `LOG-${Date.now()}`, timestamp: new Date().toISOString(),
-      employeeId: user?.id, name: user?.name, role: user?.role,
-      agency: user?.agency, area: 'Módulo RBAC', device: 'Navegador',
-      status: 'Autorizado', details: `Permisos actualizados para rol '${role.name}': [${perms.join(', ')}]`, risk: 'Alto',
-    };
-    const existing = JSON.parse(localStorage.getItem('kw_dynamic_logs') || '[]');
-    localStorage.setItem('kw_dynamic_logs', JSON.stringify([log, ...existing]));
+    setRolesData(prev => ({
+      ...prev,
+      [roleId]: { ...prev[roleId], permissions: perms },
+    }));
   };
 
-  const handleSave = () => {
-    Swal.fire({
-      icon: 'success', title: 'Políticas RBAC Guardadas',
-      text: 'La matriz de permisos ha sido compilada y distribuida a los terminales QR.',
-      confirmButtonColor: '#0d2347', background: '#ffffff', color: '#1e293b',
-    });
+  const handleSave = async () => {
+    const role = rolesData[activeRoleId];
+    if (!role) return;
+
+    setSaving(true);
+    try {
+      await apiClient.put(`/roles/${role.id_rol}`, { permissions: role.permissions });
+      Swal.fire({
+        icon: 'success',
+        title: 'Políticas RBAC Guardadas',
+        text: `Los permisos del rol '${role.name}' han sido actualizados en la base de datos.`,
+        confirmButtonColor: '#0d2347',
+        background: '#ffffff',
+        color: '#1e293b',
+      });
+    } catch (err) {
+      Swal.fire({
+        icon: 'error', title: 'Error al guardar',
+        text: err.response?.data?.detail || 'No se pudo actualizar los permisos.',
+        background: '#ffffff', color: '#1e293b',
+      });
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 border-4 border-[#8DC63F] border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-slate-500 text-sm font-medium">Cargando roles y permisos...</p>
+        </div>
+      </div>
+    );
+  }
 
   const activeRole = rolesData[activeRoleId];
+  if (!activeRole) return null;
+
   const isSuperAdmin = activeRole.permissions.includes('all');
 
   return (
@@ -85,20 +150,26 @@ const RBAC = () => {
           <h2 className="text-2xl font-black text-slate-800 font-['Outfit']">Roles y Permisos</h2>
           <p className="text-sm text-slate-500 mt-1">Configure los privilegios de cada perfil institucional y la visibilidad de módulos.</p>
         </div>
-        <button
-          onClick={handleSave}
-          className="flex items-center gap-2 px-5 py-3 bg-slate-800 hover:bg-slate-900 rounded-xl text-sm font-bold text-white tracking-wider transition-all cursor-pointer shadow-lg shrink-0"
-        >
-          <MdSave size={18} className="text-[#84cc16]" />
-          COMPILAR POLÍTICAS RBAC
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={loadRoles} className="btn-icon" title="Recargar roles">
+            <MdRefresh size={18} />
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-5 py-3 bg-slate-800 hover:bg-slate-900 disabled:opacity-60 rounded-xl text-sm font-bold text-white tracking-wider transition-all cursor-pointer shadow-lg shrink-0"
+          >
+            <MdSave size={18} className="text-[#84cc16]" />
+            {saving ? 'GUARDANDO...' : 'COMPILAR POLÍTICAS RBAC'}
+          </button>
+        </div>
       </div>
 
       {/* Info banner */}
       <div className="flex items-start gap-3 p-5 rounded-xl bg-[#84cc16]/10 border border-[#84cc16]/30 shadow-sm">
         <MdInfoOutline size={22} className="text-[#65a30d] shrink-0 mt-0.5" />
         <p className="text-sm text-slate-700 leading-relaxed font-medium">
-          <strong className="text-slate-900 font-bold">Cambios en tiempo real.</strong> Las modificaciones de permisos se propagan inmediatamente a empleados con sesiones activas. Tenga especial cuidado al otorgar{' '}
+          <strong className="text-slate-900 font-bold">Cambios persistentes.</strong> Las modificaciones de permisos se guardan en la base de datos y se aplican en el siguiente inicio de sesión de cada empleado. Tenga especial cuidado al otorgar{' '}
           <span className="text-red-600 font-bold">Acceso Total</span> o{' '}
           <span className="text-[#65a30d] font-bold">Resolver Incidentes</span>.
         </p>
@@ -148,7 +219,6 @@ const RBAC = () => {
         {/* ── MATRIZ DE PERMISOS ───────────────────── */}
         <div className="lg:col-span-8 p-6 rounded-2xl bg-white shadow-lg border border-slate-200">
 
-          {/* Header del rol activo */}
           <div className="flex items-start justify-between pb-5 border-b border-slate-200 mb-5 gap-3">
             <div>
               <h3 className="text-lg font-black text-slate-800 font-['Outfit']">
@@ -162,7 +232,6 @@ const RBAC = () => {
             </div>
           </div>
 
-          {/* Permissions list */}
           <div className="space-y-3 max-h-[520px] overflow-y-auto pr-2">
             {PERMISSIONS.map(({ id, label, category }) => {
               const hasPerm = isSuperAdmin || activeRole.permissions.includes(id);
@@ -205,7 +274,7 @@ const RBAC = () => {
 
           <div className="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 font-medium">
             <span>Cooperativa Kullki Wasi Ltda.</span>
-            <span className="font-mono bg-slate-100 px-2 py-1 rounded">Hash SHA-256 simulado</span>
+            <span className="font-mono bg-slate-100 px-2 py-1 rounded">DB: {Object.keys(rolesData).length} roles cargados</span>
           </div>
         </div>
 
