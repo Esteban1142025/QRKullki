@@ -248,11 +248,11 @@ const QRScanner = () => {
 
             {/* Method B */}
             <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-2 shadow-sm">
-              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Método B — QR Manual (Prueba de Fallo)</span>
+              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Ingreso Manual de Código QR</span>
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder='Pruebe con "QR-FALSO-999" para denegar...'
+                  placeholder='Ingrese el código del colaborador...'
                   value={scannedQR}
                   onChange={e => setScannedQR(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && validate(scannedQR)}

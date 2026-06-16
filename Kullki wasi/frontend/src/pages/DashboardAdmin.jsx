@@ -12,18 +12,6 @@ import {
 } from 'react-icons/md';
 import { Link } from 'react-router-dom';
 
-const accessTimeData = [
-  { time: '07:00', Autorizados: 12, Denegados: 1 },
-  { time: '08:00', Autorizados: 45, Denegados: 3 },
-  { time: '09:00', Autorizados: 30, Denegados: 2 },
-  { time: '10:00', Autorizados: 22, Denegados: 5 },
-  { time: '11:00', Autorizados: 28, Denegados: 1 },
-  { time: '12:00', Autorizados: 15, Denegados: 0 },
-  { time: '13:00', Autorizados: 18, Denegados: 0 },
-  { time: '14:00', Autorizados: 25, Denegados: 2 },
-  { time: '15:00', Autorizados: 20, Denegados: 1 },
-  { time: '16:00', Autorizados: 10, Denegados: 0 },
-];
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -129,9 +117,28 @@ const DashboardAdmin = () => {
 
   const activeEmployees   = employees.filter(e => e.status === 'Activo').length;
   const activeAgencies    = agencies.filter(a => a.status === 'Activo').length;
-  const activeAlerts      = alerts.filter(a => !a.isResolved).length;
+  const activeAlerts      = alerts.filter(a => !a.isResolved && a.status !== 'RESUELTA').length;
   const credentialsCount  = employees.length;
-  const accessToday       = logs.filter(l => new Date(l.timestamp).toDateString() === new Date().toDateString()).length;
+  const todayStr          = new Date().toDateString();
+  const accessToday       = logs.filter(l => new Date(l.timestamp).toDateString() === todayStr).length;
+
+  // Gráfica horaria — datos reales del día actual agrupados por hora
+  const hourBuckets = {};
+  for (let h = 6; h <= 18; h++) {
+    const key = `${String(h).padStart(2, '0')}:00`;
+    hourBuckets[key] = { time: key, Autorizados: 0, Denegados: 0 };
+  }
+  logs
+    .filter(l => new Date(l.timestamp).toDateString() === todayStr)
+    .forEach(l => {
+      const h = new Date(l.timestamp).getHours();
+      if (h >= 6 && h <= 18) {
+        const key = `${String(h).padStart(2, '0')}:00`;
+        if (l.status === 'Autorizado') hourBuckets[key].Autorizados++;
+        else hourBuckets[key].Denegados++;
+      }
+    });
+  const accessTimeData = Object.values(hourBuckets);
 
   const agencyData = agencies.map(a => ({
     name: a.name.replace('Agencia ', '').replace('Matriz ', 'Matriz'),
@@ -155,7 +162,7 @@ const DashboardAdmin = () => {
             <p className="text-xs text-slate-500 mt-1.5 max-w-xl leading-relaxed">
               Bienvenido, <strong className="text-slate-700">{user?.name}</strong>. Operando como{' '}
               <strong className="text-[#79ac34]">{user?.roleName}</strong> ·{' '}
-              <strong className="text-[#79ac34]">{user?.agency === 'MAT' ? 'Matriz Ambato' : user?.agency}</strong>.
+              <strong className="text-[#79ac34]">{user?.agencyDisplayName || user?.agencyName || (user?.agency === 'MAT' ? 'Matriz Ambato' : user?.agency)}</strong>.
             </p>
           </div>
           <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-slate-200 shrink-0 shadow-sm">

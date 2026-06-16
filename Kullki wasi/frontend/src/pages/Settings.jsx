@@ -7,17 +7,27 @@ import {
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../services/api/apiClient';
 
+const SETTINGS_KEY = 'kw_system_config';
+const DEFAULT_CONFIG = {
+  sessionTimeout: '30',
+  twoFactor: true,
+  apiEndpoint: window.location.origin.replace('3000', '3001') || 'http://localhost:3001',
+  logRetention: '90',
+};
+
 const Settings = () => {
   const { user } = useAuth();
   const [restoringFile, setRestoringFile] = useState(null);
   const [restoring, setRestoring]         = useState(false);
   const fileInputRef = useRef(null);
 
-  const [config, setConfig] = useState({
-    sessionTimeout: '30',
-    twoFactor: true,
-    apiEndpoint: 'https://api.kullkiwasi.com.ec/v1',
-    logRetention: '90',
+  const [config, setConfig] = useState(() => {
+    try {
+      const saved = localStorage.getItem(SETTINGS_KEY);
+      return saved ? { ...DEFAULT_CONFIG, ...JSON.parse(saved) } : DEFAULT_CONFIG;
+    } catch {
+      return DEFAULT_CONFIG;
+    }
   });
 
   /* ── Respaldo ────────────────────────────────────────── */
@@ -107,12 +117,17 @@ const Settings = () => {
   /* ── Guardar config ──────────────────────────────────── */
   const handleSaveConfig = (e) => {
     e.preventDefault();
-    Swal.fire({
-      icon: 'success', title: 'Configuración Guardada',
-      text: 'Los parámetros han sido actualizados.',
-      timer: 1500, showConfirmButton: false,
-      background: '#ffffff', color: '#1e293b',
-    });
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(config));
+      Swal.fire({
+        icon: 'success', title: 'Configuración Guardada',
+        text: 'Los parámetros han sido actualizados correctamente.',
+        timer: 1500, showConfirmButton: false,
+        background: '#ffffff', color: '#1e293b',
+      });
+    } catch {
+      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo guardar la configuración.' });
+    }
   };
 
   return (

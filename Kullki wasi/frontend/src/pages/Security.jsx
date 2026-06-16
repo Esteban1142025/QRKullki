@@ -3,7 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import apiClient from '../services/api/apiClient';
 import Swal from 'sweetalert2';
 import {
-  MdWarning, MdCheckCircle, MdEdit, MdClose, MdHistory, MdPerson, MdSave, MdRefresh
+  MdWarning, MdCheckCircle, MdEdit, MdClose, MdHistory, MdPerson, MdSave, MdRefresh,
+  MdFilterList
 } from 'react-icons/md';
 
 const Security = () => {
@@ -58,8 +59,28 @@ const Security = () => {
     }
   };
 
+  const [statusFilter, setStatusFilter] = useState('TODAS');
+
   const unresolvedAlerts = alerts.filter(a => !a.isResolved && a.status !== 'RESUELTA');
-  const resolvedAlerts = alerts.filter(a => a.isResolved || a.status === 'RESUELTA');
+  const resolvedAlerts   = alerts.filter(a => a.isResolved  || a.status === 'RESUELTA');
+
+  const counts = {
+    TODAS:            alerts.length,
+    ABIERTA:          alerts.filter(a => a.status === 'ABIERTA').length,
+    EN_INVESTIGACION: alerts.filter(a => a.status === 'EN_INVESTIGACION').length,
+    RESUELTA:         resolvedAlerts.length,
+  };
+
+  // Listas filtradas para cada panel
+  const activeDisplay = statusFilter === 'TODAS'
+    ? unresolvedAlerts
+    : statusFilter === 'RESUELTA'
+      ? []
+      : unresolvedAlerts.filter(a => a.status === statusFilter);
+
+  const resolvedDisplay = (statusFilter === 'TODAS' || statusFilter === 'RESUELTA')
+    ? resolvedAlerts
+    : [];
 
   if (loading) {
     return (
@@ -85,23 +106,48 @@ const Security = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      {/* Filtros de estado */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="flex items-center gap-1.5 text-xs font-bold text-slate-400 uppercase tracking-widest mr-1">
+          <MdFilterList size={15} /> Filtrar
+        </span>
+        {[
+          { key: 'TODAS',            label: 'Todas',            color: 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200',          active: 'bg-slate-700 text-white border-slate-700' },
+          { key: 'ABIERTA',          label: 'Abierta',          color: 'bg-orange-50 text-orange-600 border-orange-200 hover:bg-orange-100',        active: 'bg-orange-500 text-white border-orange-500' },
+          { key: 'EN_INVESTIGACION', label: 'En Investigación', color: 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100',               active: 'bg-blue-600 text-white border-blue-600' },
+          { key: 'RESUELTA',         label: 'Resuelta',         color: 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100',    active: 'bg-emerald-600 text-white border-emerald-600' },
+        ].map(({ key, label, color, active }) => (
+          <button
+            key={key}
+            onClick={() => setStatusFilter(key)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${statusFilter === key ? active : color}`}
+          >
+            {label}
+            <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${statusFilter === key ? 'bg-white/25' : 'bg-white/80'}`}>
+              {counts[key]}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div className={`grid grid-cols-1 gap-8 ${resolvedDisplay.length > 0 ? 'lg:grid-cols-12' : ''}`}>
 
         {/* Alertas Activas */}
-        <div className="lg:col-span-7 space-y-4">
+        {(statusFilter !== 'RESUELTA') && (
+        <div className={`space-y-4 ${resolvedDisplay.length > 0 ? 'lg:col-span-7' : 'lg:col-span-12'}`}>
           <div className="flex items-center gap-2 px-1">
             <span className="relative flex h-3 w-3">
-              {unresolvedAlerts.length > 0 && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />}
-              <span className={`relative inline-flex rounded-full h-3 w-3 ${unresolvedAlerts.length > 0 ? 'bg-red-500' : 'bg-slate-400'}`} />
+              {activeDisplay.length > 0 && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />}
+              <span className={`relative inline-flex rounded-full h-3 w-3 ${activeDisplay.length > 0 ? 'bg-red-500' : 'bg-slate-400'}`} />
             </span>
-            <h3 className={`text-sm font-bold uppercase tracking-widest ${unresolvedAlerts.length > 0 ? 'text-red-500' : 'text-slate-500'}`}>
-              Amenazas Activas ({unresolvedAlerts.length})
+            <h3 className={`text-sm font-bold uppercase tracking-widest ${activeDisplay.length > 0 ? 'text-red-500' : 'text-slate-500'}`}>
+              {statusFilter === 'EN_INVESTIGACION' ? 'En Investigación' : statusFilter === 'ABIERTA' ? 'Abiertas' : 'Amenazas Activas'} ({activeDisplay.length})
             </h3>
           </div>
 
           <div className="space-y-4">
-            {unresolvedAlerts.length > 0 ? (
-              unresolvedAlerts.map((alert) => (
+            {activeDisplay.length > 0 ? (
+              activeDisplay.map((alert) => (
                 <div key={alert.id} className={`p-6 rounded-2xl bg-white relative overflow-hidden transition-all shadow-md border-y border-r border-l-4 ${
                   alert.severity === 'Crítica'
                     ? 'border-l-red-500 border-y-red-100 border-r-red-100 hover:shadow-lg'
@@ -153,45 +199,45 @@ const Security = () => {
                 <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500">
                   <MdCheckCircle size={32} />
                 </div>
-                <p className="font-medium">No hay amenazas de seguridad activas en la Cooperativa.<br />El entorno está asegurado.</p>
+                <p className="font-medium">
+                  {statusFilter === 'ABIERTA' ? 'No hay alertas abiertas.' : statusFilter === 'EN_INVESTIGACION' ? 'No hay alertas en investigación.' : 'No hay amenazas de seguridad activas en la Cooperativa.'}
+                  <br />{statusFilter === 'TODAS' && 'El entorno está asegurado.'}
+                </p>
               </div>
             )}
           </div>
         </div>
+        )}
 
         {/* Historial Resueltas */}
-        <div className="lg:col-span-5 space-y-4">
+        {resolvedDisplay.length > 0 && (
+        <div className={`space-y-4 ${statusFilter === 'RESUELTA' ? 'lg:col-span-12' : 'lg:col-span-5'}`}>
           <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest px-1">Historial de Eventos Solventados</h3>
-          <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
-            {resolvedAlerts.length > 0 ? (
-              resolvedAlerts.map((alert) => (
-                <div key={alert.id} className="p-5 rounded-2xl border border-slate-200 bg-slate-50 space-y-3 text-sm hover:bg-white hover:shadow-md transition-all">
-                  <div className="flex justify-between items-start gap-3">
-                    <span className="font-bold text-slate-800 leading-snug">{alert.type}</span>
-                    <span className="text-[10px] px-2 py-1 bg-emerald-100 text-emerald-700 border border-emerald-200 rounded font-bold uppercase shrink-0">
-                      Resuelta
-                    </span>
-                  </div>
-                  <p className="text-slate-600 leading-relaxed text-xs font-medium">{alert.details}</p>
-                  <div className="p-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-600 flex gap-3 shadow-sm">
-                    <MdCheckCircle size={18} className="text-emerald-500 shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="text-slate-800 block mb-1">Resolución:</strong>
-                      {alert.resolvedBy || 'Resuelto por operador.'}
-                    </div>
-                  </div>
-                  <button onClick={() => openManage(alert)} className="text-[#84cc16] text-xs font-bold hover:underline flex items-center gap-1">
-                    <MdHistory size={14} /> Ver Detalles
-                  </button>
+          <div className={`space-y-4 overflow-y-auto pr-2 ${statusFilter === 'RESUELTA' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-none' : 'max-h-[600px]'}`}>
+            {resolvedDisplay.map((alert) => (
+              <div key={alert.id} className="p-5 rounded-2xl border border-slate-200 bg-slate-50 space-y-3 text-sm hover:bg-white hover:shadow-md transition-all">
+                <div className="flex justify-between items-start gap-3">
+                  <span className="font-bold text-slate-800 leading-snug">{alert.type}</span>
+                  <span className="text-[10px] px-2 py-1 bg-emerald-100 text-emerald-700 border border-emerald-200 rounded font-bold uppercase shrink-0">
+                    Resuelta
+                  </span>
                 </div>
-              ))
-            ) : (
-              <div className="p-8 text-center text-slate-500 text-sm border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50 font-medium">
-                No hay registros de soluciones anteriores.
+                <p className="text-slate-600 leading-relaxed text-xs font-medium">{alert.details}</p>
+                <div className="p-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-600 flex gap-3 shadow-sm">
+                  <MdCheckCircle size={18} className="text-emerald-500 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-slate-800 block mb-1">Resolución:</strong>
+                    {alert.resolvedBy || 'Resuelto por operador.'}
+                  </div>
+                </div>
+                <button onClick={() => openManage(alert)} className="text-[#84cc16] text-xs font-bold hover:underline flex items-center gap-1">
+                  <MdHistory size={14} /> Ver Detalles
+                </button>
               </div>
-            )}
+            ))}
           </div>
         </div>
+        )}
       </div>
 
       {/* MANAGE ALERT MODAL */}

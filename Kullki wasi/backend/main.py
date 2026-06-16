@@ -625,6 +625,96 @@ def actualizar_rol(id_rol: int, data: dict, db: Session = Depends(get_db)):
         "permissions": [p.codigo_permiso for p in rol.permisos]
     }
 
+# --- Dashboard de Auditoría ---
+
+@app.get("/api/v1/audit/dashboard")
+def get_audit_dashboard(db: Session = Depends(get_db)):
+    from sqlalchemy import func, extract
+
+    # Totales de bitácora
+    total_logs   = db.query(func.count(models.BitacoraAcceso.id_bitacora)).scalar() or 0
+    concedidos   = db.query(func.count(models.BitacoraAcceso.id_bitacora)).filter(models.BitacoraAcceso.resultado == "CONCEDIDO").scalar() or 0
+    denegados    = db.query(func.count(models.BitacoraAcceso.id_bitacora)).filter(models.BitacoraAcceso.resultado == "DENEGADO").scalar() or 0
+
+    compliance   = round(concedidos / total_logs * 100, 1) if total_logs > 0 else 100.0
+    risk_level   = round(denegados  / total_logs * 100, 1) if total_logs > 0 else 0.0
+
+    # Alertas por estado
+    total_alerts   = db.query(func.count(models.AlertaSeguridad.id_alerta)).scalar() or 0
+    open_alerts    = db.query(func.count(models.AlertaSeguridad.id_alerta)).filter(models.AlertaSeguridad.estado == "ABIERTA").scalar() or 0
+    investigating  = db.query(func.count(models.AlertaSeguridad.id_alerta)).filter(models.AlertaSeguridad.estado == "EN_INVESTIGACION").scalar() or 0
+    resolved_alerts = db.query(func.count(models.AlertaSeguridad.id_alerta)).filter(models.AlertaSeguridad.estado == "RESUELTA").scalar() or 0
+
+    # Áreas y empleados activos
+    active_areas     = db.query(func.count(models.AreaRestringida.id_area)).filter(models.AreaRestringida.estado == True).scalar() or 0
+    total_areas      = db.query(func.count(models.AreaRestringida.id_area)).scalar() or 0
+    active_employees = db.query(func.count(models.Empleado.id_empleado)).filter(models.Empleado.estado_laboral == "ACTIVO").scalar() or 0
+    total_roles      = db.query(func.count(models.Rol.id_rol)).filter(models.Rol.activo == True).scalar() or 0
+
+    # Dispositivos activos
+    active_devices = db.query(func.count(models.DispositivoEscaneo.id_dispositivo)).filter(models.DispositivoEscaneo.estado == True).scalar() or 0
+
+    # Datos mensuales — últimos 6 meses
+    now = datetime.datetime.utcnow()
+    month_names = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+    monthly_data = []
+    for i in range(5, -1, -1):
+        raw_month  = now.month - i
+        year  = now.year + (raw_month - 1) // 12
+        month = ((raw_month - 1) % 12) + 1
+        m_total = db.query(func.count(models.BitacoraAcceso.id_bitacora)).filter(
+            extract('year',  models.BitacoraAcceso.fecha_hora) == year,
+            extract('month', models.BitacoraAcceso.fecha_hora) == month,
+        ).scalar() or 0
+        m_conc = db.query(func.count(models.BitacoraAcceso.id_bitacora)).filter(
+            extract('year',  models.BitacoraAcceso.fecha_hora) == year,
+            extract('month', models.BitacoraAcceso.fecha_hora) == month,
+            models.BitacoraAcceso.resultado == "CONCEDIDO",
+        ).scalar() or 0
+        monthly_data.append({
+            "month": month_names[month - 1],
+            "year": year,
+            "value": round(m_conc / m_total * 100, 1) if m_total > 0 else None,
+            "total": m_total,
+            "concedidos": m_conc,
+            "denegados": m_total - m_conc,
+        })
+
+    # Últimas 10 alertas resueltas (para historial)
+    resolved_history = db.query(models.AlertaSeguridad).filter(
+        models.AlertaSeguridad.estado == "RESUELTA"
+    ).order_by(models.AlertaSeguridad.fecha_generacion.desc()).limit(10).all()
+    history = [{
+        "id":     f"ALT-{a.id_alerta}",
+        "date":   utc_iso(a.fecha_generacion),
+        "type":   a.tipo_alerta,
+        "area":   a.bitacora.area.nombre if (a.bitacora and a.bitacora.area) else "Sistema",
+        "status": "Resuelta",
+    } for a in resolved_history]
+
+    return {
+        "kpis": {
+            "compliance_score":  compliance,
+            "risk_level":        risk_level,
+            "total_logs":        total_logs,
+            "concedidos":        concedidos,
+            "denegados":         denegados,
+            "active_areas":      active_areas,
+            "total_areas":       total_areas,
+            "active_employees":  active_employees,
+            "total_roles":       total_roles,
+            "active_devices":    active_devices,
+        },
+        "alerts": {
+            "total":       total_alerts,
+            "open":        open_alerts,
+            "investigating": investigating,
+            "resolved":    resolved_alerts,
+        },
+        "monthly_chart": monthly_data,
+        "resolved_history": history,
+    }
+
 # --- Bitácora / Logs ---
 
 @app.get("/api/v1/audit-logs")

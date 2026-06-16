@@ -1,162 +1,169 @@
-# Sistema de Control de Accesos - Kullki Wasi
+# Sistema de Control de Accesos — Kullki Wasi
 
-Sistema automatizado de control de accesos y trazabilidad de personal desarrollado con React + FastAPI + PostgreSQL.
+Sistema automatizado de control de accesos fisicos y trazabilidad de personal para la Cooperativa de Ahorro y Credito Kullki Wasi Ltda., desarrollado bajo normativa SEPS Segmento 1.
 
-## 📋 Requisitos Previos
+Stack: React + Vite (frontend), FastAPI + SQLAlchemy (backend), PostgreSQL (base de datos), Docker Compose (orquestacion).
 
-- **Docker Desktop** instalado y ejecutándose
-- **Git** instalado
-- Navegador web moderno (Chrome, Firefox, Edge)
+---
 
-## 🚀 Guía para el Equipo
-
-### Paso 1: Clonar el Repositorio
-
-```bash
-git clone <URL_DEL_REPOSITORIO>
-cd <NOMBRE_DEL_DIRECTORIO>
-```
-
-### Paso 2: Verificar Docker
-
-Asegúrate de que Docker Desktop esté ejecutándose:
-```bash
-docker --version
-docker-compose --version
-```
-
-### Paso 3: Ejecutar el Proyecto
-
-```bash
-docker-compose up --build
-```
-
-Este comando:
-- Construirá las imágenes Docker de frontend, backend y base de datos
-- Iniciará todos los servicios automáticamente
-- Configurará PostgreSQL con las tablas necesarias
-
-**Tiempo estimado**: 5-10 minutos en primera ejecución (depende de conexión a internet)
-
-### Paso 4: Poblar Base de Datos
-
-En una nueva terminal:
-
-```bash
-docker-compose exec backend python seed_db.py
-```
-
-Esto creará:
-- Roles (admin, empleado)
-- Agencia MAT
-- Usuarios de prueba
-
-### Paso 5: Acceder al Sistema
-
-- **Frontend**: http://localhost:8080
-- **Backend API**: http://localhost:3001
-- **Documentación API**: http://localhost:3001/docs
-
-## 🔐 Credenciales de Prueba
-
-### Administrador
-- **DNI**: 0000000000
-- **Contraseña**: kullki123
-
-### Empleado
-- **DNI**: 1111111111
-- **Contraseña**: kullki123
-
-## 📂 Estructura del Proyecto
+## Estructura del Proyecto
 
 ```
 Kullki wasi/
-├── frontend/       → Aplicación React + Vite (interfaz de usuario)
-├── backend/        → API FastAPI + SQLAlchemy (servidor Python)
-├── database/       → Scripts SQL de la base de datos PostgreSQL
-├── docker-compose.yml
+├── frontend/          Aplicacion React + Vite (interfaz de usuario, puerto 3000)
+├── backend/           API REST FastAPI + SQLAlchemy (servidor Python, puerto 3001)
+├── database/          Esquema SQL de PostgreSQL (kullkidb_postgres.sql)
+├── docker-compose.yml Orquestacion de los 3 servicios
 └── README.md
 ```
 
-## 🔧 Comandos Útiles
+---
 
-### Ver estado de los servicios
+## Requisitos Previos
+
+- Docker Desktop instalado y en ejecucion
+- Git instalado
+- Navegador web moderno (Chrome, Firefox, Edge)
+
+---
+
+## Instalacion y Ejecucion con Docker
+
+### 1. Clonar el repositorio
+
 ```bash
-docker-compose ps
+git clone <URL_DEL_REPOSITORIO>
+cd "Kullki wasi"
 ```
 
-### Ver logs
-```bash
-docker-compose logs -f
-docker-compose logs -f backend
-docker-compose logs -f db
-```
+### 2. Levantar todos los servicios
 
-### Detener servicios
 ```bash
-docker-compose down
-```
-
-### Reiniciar servicios
-```bash
-docker-compose restart
-```
-
-### Reconstruir desde cero
-```bash
-docker-compose down -v
 docker-compose up --build
 ```
 
-## ⚠️ Notas Importantes
+En la primera ejecucion descarga las imagenes base y compila el proyecto. Tiempo estimado: 5-10 minutos segun conexion a internet.
 
-### Compatibilidad con Devilbox
-Si usas Devilbox en tu sistema, este proyecto está configurado para evitar conflictos de puertos:
-- Frontend usa puerto 8080 (Devilbox usa 80)
-- Backend usa puerto 3001
-- PostgreSQL usa puerto 5433 (Devilbox usa 3306 para MySQL)
+### 3. Acceder al sistema
 
-### Base de Datos
-El proyecto usa **PostgreSQL** (no MySQL). La configuración está en `docker-compose.yml` y `backend/database.py`.
+| Servicio          | URL                          |
+|-------------------|------------------------------|
+| Frontend          | http://localhost:3000        |
+| Backend API       | http://localhost:3001        |
+| Documentacion API | http://localhost:3001/docs   |
 
-### Desarrollo Local
-Si prefieres desarrollo local sin Docker:
+---
 
-**Backend**:
-```bash
-cd backend
-pip install -r requirements.txt
-python seed_db.py
-uvicorn main:app --host 0.0.0.0 --port 3001
-```
+## Ejecucion en Desarrollo Local (sin Docker)
 
-**Frontend**:
+### Frontend
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-Necesitarás PostgreSQL local en puerto 5433 o cambiar la configuración en `backend/database.py`.
+Levanta Vite en http://localhost:5173.
 
-## 🐛 Solución de Problemas
+### Backend
 
-### Error: "port is already in use"
-- Verifica que Devilbox u otro servicio no esté usando los puertos 8080, 3001 o 5433
-- Detén Devilbox temporalmente o cambia los puertos en `docker-compose.yml`
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 3001
+```
 
-### Error: "failed to solve: npm run build"
-- Este proyecto usa Node.js 20 para compatibilidad con Tailwind CSS v4
-- Asegúrate de tener Docker Desktop actualizado
+Requiere PostgreSQL disponible en el puerto 5433. Ajustar la cadena de conexion en `backend/database.py` si es necesario.
 
-### Error: "service db is not running"
-- Verifica que el servicio de base de datos esté corriendo: `docker-compose ps`
-- Revisa los logs: `docker-compose logs db`
+---
 
-## 📞 Soporte
+## Puertos del Sistema
 
-Si encuentras problemas:
-1. Revisa los logs con `docker-compose logs -f`
-2. Verifica que Docker Desktop esté ejecutándose
-3. Asegúrate de tener suficiente espacio en disco
-4. Contacta al administrador del proyecto
+| Servicio    | Puerto externo | Puerto interno |
+|-------------|---------------|----------------|
+| Frontend    | 3000          | 80 (nginx)     |
+| Backend     | 3001          | 3001 (uvicorn) |
+| PostgreSQL  | 5433          | 5432           |
+
+---
+
+## Usuarios del Sistema
+
+Las siguientes cuentas estan registradas en la base de datos. Todas las contrasenas son las configuradas durante el proceso de seed inicial.
+
+| Rol               | Cedula       | Contrasena    | Modulos accesibles                                      |
+|-------------------|--------------|---------------|---------------------------------------------------------|
+| Administrador     | 0987654321   | admin123      | Todos los modulos y configuracion del sistema           |
+| Empleado          | 1712345678   | empleado123   | Dashboard personal y perfil                             |
+| Talento Humano    | 1234567890   | talento123    | Gestion de empleados y credenciales QR                  |
+| Oficial Riesgos   | 2345678901   | riesgos123    | Consola de alertas e incidentes de seguridad            |
+| Seguridad Fisica  | 3456789012   | seguridad123  | Alertas, control QR y areas criticas                    |
+| Auditor Interno   | 4567890123   | auditor123    | Modulo de auditoria y bitacora de accesos               |
+| Jefe de Agencia   | 5678901234   | jefe123       | Dashboard, agencias y empleados de su agencia           |
+| Tecnico TI        | 6789012345   | tecnico123    | Dispositivos de escaneo y configuracion del sistema     |
+
+### Descripcion de roles y permisos (RBAC)
+
+- **Administrador**: acceso irrestricto a todos los modulos, configuracion global, gestion de usuarios y respaldo de datos.
+- **Empleado**: visualiza unicamente las areas criticas a las que tiene permiso segun su rol institucional.
+- **Talento Humano**: crea, edita y desactiva cuentas de empleados; gestiona las credenciales QR institucionales.
+- **Oficial Riesgos**: revisa y actualiza el estado de las alertas de seguridad (Abierta, En Investigacion, Resuelta).
+- **Seguridad Fisica**: opera el lector QR para validar accesos y gestiona alertas activas.
+- **Auditor Interno**: genera informes de auditoria, revisa la bitacora completa de accesos y exporta reportes PDF/Excel.
+- **Jefe de Agencia**: supervisa el dashboard de su agencia y el personal asignado a ella.
+- **Tecnico TI**: administra los dispositivos de escaneo QR registrados en el sistema.
+
+---
+
+## Comandos de Operacion
+
+```bash
+# Ver estado de los servicios
+docker-compose ps
+
+# Ver logs en tiempo real
+docker-compose logs -f
+
+# Ver logs de un servicio especifico
+docker-compose logs -f backend
+docker-compose logs -f db
+
+# Reiniciar un servicio
+docker-compose restart backend
+
+# Detener todos los servicios
+docker-compose down
+
+# Eliminar volumenes y reconstruir desde cero
+docker-compose down -v
+docker-compose up --build
+```
+
+### Despliegue rapido sin rebuild completo
+
+Para aplicar cambios al backend o al frontend sin reconstruir las imagenes Docker:
+
+```bash
+# Backend: copiar archivo modificado y recargar
+docker cp backend/main.py kullkiwasi-backend-1:/app/main.py
+docker-compose restart backend
+
+# Frontend: compilar localmente y copiar al contenedor
+cd frontend
+npm run build
+docker cp dist/. kullkiwasi-frontend-1:/usr/share/nginx/html/
+docker exec kullkiwasi-frontend-1 nginx -s reload
+```
+
+---
+
+## Solucion de Problemas
+
+**"port is already in use"**: otro servicio ocupa el puerto 3000, 3001 o 5433. Cambia el puerto afectado en `docker-compose.yml`.
+
+**"failed to solve: npm run build"**: actualiza Docker Desktop. El proyecto requiere Node.js 20 o superior en la imagen de build.
+
+**"service db is not running"**: revisa los logs con `docker-compose logs db` y verifica que el archivo SQL de inicializacion en `database/` sea valido.
+
+**El backend no refleja cambios**: el contenedor corre una imagen compilada sin hot-reload. Usa el comando de despliegue rapido descrito arriba.
