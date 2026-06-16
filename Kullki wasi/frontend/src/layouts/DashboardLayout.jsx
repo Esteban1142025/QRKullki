@@ -65,12 +65,14 @@ const DashboardLayout = () => {
     return () => clearInterval(t);
   }, []);
 
-  // Cargar agencias activas para el switcher
-  useEffect(() => {
+  // Cargar agencias al montar y cada vez que se abre el switcher (para reflejar cambios en tiempo real)
+  const fetchAgencies = () => {
     apiClient.get('/agencias')
-      .then(res => setActiveAgencies(res.data.filter(a => a.status === 'Activo')))
+      .then(res => setActiveAgencies(res.data))
       .catch(() => {});
-  }, []);
+  };
+  useEffect(() => { fetchAgencies(); }, []);
+  useEffect(() => { if (showAgencySwitcher) fetchAgencies(); }, [showAgencySwitcher]);
 
   // Cargar notificaciones dinámicas — aisladas por agencia
   useEffect(() => {
@@ -309,27 +311,35 @@ const DashboardLayout = () => {
                     </div>
                     <div className="max-h-64 overflow-y-auto py-1.5">
                       {activeAgencies.length > 0 ? activeAgencies.map(ag => {
-                        const isActive = ag.id === user?.agency;
+                        const isCurrent = ag.id === user?.agency;
+                        const isInactive = ag.status !== 'Activo';
                         return (
                           <button
                             key={ag.id}
                             onClick={() => { switchAgency(ag.id, ag.name); setShowAgencySwitcher(false); }}
-                            className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center justify-between gap-3 ${isActive ? 'bg-[#84cc16]/5' : ''}`}
+                            className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center justify-between gap-3 ${isCurrent ? 'bg-[#84cc16]/5' : ''} ${isInactive ? 'opacity-60' : ''}`}
                           >
                             <div className="min-w-0">
-                              <p className={`text-xs font-bold truncate ${isActive ? 'text-[#65a30d]' : 'text-slate-700'}`}>{ag.name}</p>
+                              <p className={`text-xs font-bold truncate ${isCurrent ? 'text-[#65a30d]' : isInactive ? 'text-slate-400' : 'text-slate-700'}`}>{ag.name}</p>
                               <p className="text-[10px] text-slate-400 font-mono mt-0.5">{ag.id} · {ag.type}</p>
                             </div>
-                            {isActive && (
-                              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#84cc16]/15 text-[#65a30d] border border-[#84cc16]/30 shrink-0">
-                                ACTIVA
-                              </span>
-                            )}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {isInactive && (
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-400 border border-slate-200">
+                                  INACTIVA
+                                </span>
+                              )}
+                              {isCurrent && (
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#84cc16]/15 text-[#65a30d] border border-[#84cc16]/30">
+                                  ACTUAL
+                                </span>
+                              )}
+                            </div>
                           </button>
                         );
                       }) : (
                         <div className="px-4 py-6 text-center text-xs text-slate-400 font-medium">
-                          No hay agencias activas disponibles.
+                          No hay agencias disponibles.
                         </div>
                       )}
                     </div>
