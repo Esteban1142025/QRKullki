@@ -54,7 +54,6 @@ class Empleado(Base):
     apellidos = Column(String(100), nullable=False)
     email = Column(String(150), unique=True, nullable=True)
     password_hash = Column(String(255), nullable=True)
-    totp_secret = Column(String(255), nullable=True)
     estado_laboral = Column(String(20), default='ACTIVO')
     departamento = Column(String(100), nullable=True)
     creado_en = Column(DateTime, default=datetime.datetime.utcnow)

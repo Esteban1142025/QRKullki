@@ -7,7 +7,6 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from database import SessionLocal, engine
 import models
 import bcrypt
-import pyotp
 
 def seed():
     # Asegurarnos de que las tablas existan
@@ -115,15 +114,6 @@ def seed():
         jefe_pwd_hash = bcrypt.hashpw("jefe123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         tecnico_pwd_hash = bcrypt.hashpw("tecnico123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         
-        admin_totp = pyotp.random_base32()
-        comun_totp = pyotp.random_base32()
-        talento_totp = pyotp.random_base32()
-        riesgos_totp = pyotp.random_base32()
-        seguridad_totp = pyotp.random_base32()
-        auditor_totp = pyotp.random_base32()
-        jefe_totp = pyotp.random_base32()
-        tecnico_totp = pyotp.random_base32()
-
         # Administrador
         admin = db.query(models.Empleado).filter(models.Empleado.identificacion == "0987654321").first()
         if not admin:
@@ -134,7 +124,6 @@ def seed():
                 email="carlos.ruiz@kullkiwasi.com",
                 id_agencia_base=agencia.id_agencia,
                 password_hash=admin_pwd_hash,
-                totp_secret=admin_totp,
                 estado_laboral="ACTIVO"
             )
             admin.roles.append(rol_admin)
@@ -150,7 +139,6 @@ def seed():
                 email="maria.garcia@kullkiwasi.com",
                 id_agencia_base=agencia.id_agencia,
                 password_hash=empleado_pwd_hash,
-                totp_secret=comun_totp,
                 estado_laboral="ACTIVO"
             )
             comun.roles.append(rol_empleado)
@@ -166,7 +154,6 @@ def seed():
                 email="juan.perez@kullkiwasi.com",
                 id_agencia_base=agencia.id_agencia,
                 password_hash=talento_pwd_hash,
-                totp_secret=talento_totp,
                 estado_laboral="ACTIVO"
             )
             talento.roles.append(rol_talento_humano)
@@ -182,7 +169,6 @@ def seed():
                 email="ana.lopez@kullkiwasi.com",
                 id_agencia_base=agencia.id_agencia,
                 password_hash=riesgos_pwd_hash,
-                totp_secret=riesgos_totp,
                 estado_laboral="ACTIVO"
             )
             riesgos.roles.append(rol_riesgos)
@@ -198,7 +184,6 @@ def seed():
                 email="carlos.mendoza@kullkiwasi.com",
                 id_agencia_base=agencia.id_agencia,
                 password_hash=seguridad_pwd_hash,
-                totp_secret=seguridad_totp,
                 estado_laboral="ACTIVO"
             )
             seguridad.roles.append(rol_seguridad_fisica)
@@ -214,7 +199,6 @@ def seed():
                 email="maria.torres@kullkiwasi.com",
                 id_agencia_base=agencia.id_agencia,
                 password_hash=auditor_pwd_hash,
-                totp_secret=auditor_totp,
                 estado_laboral="ACTIVO"
             )
             auditor.roles.append(rol_auditor)
@@ -230,7 +214,6 @@ def seed():
                 email="roberto.sanchez@kullkiwasi.com",
                 id_agencia_base=agencia.id_agencia,
                 password_hash=jefe_pwd_hash,
-                totp_secret=jefe_totp,
                 estado_laboral="ACTIVO"
             )
             jefe.roles.append(rol_jefe_agencia)
@@ -246,18 +229,22 @@ def seed():
                 email="luis.ramirez@kullkiwasi.com",
                 id_agencia_base=agencia.id_agencia,
                 password_hash=tecnico_pwd_hash,
-                totp_secret=tecnico_totp,
                 estado_laboral="ACTIVO"
             )
             tecnico.roles.append(rol_tecnico_ti)
             db.add(tecnico)
 
         db.commit()
-        print("¡Base de datos poblada con éxito con RBAC Dinámico y TOTP!")
+        print("Base de datos poblada con exito.")
         print("--- Credenciales de Prueba ---")
-        print(f"Administrador -> Cédula: 0987654321 | Pass: admin123 | TOTP Secret: {admin_totp}")
-        print(f"Empleado      -> Cédula: 1712345678 | Pass: empleado123 | TOTP Secret: {comun_totp}")
-        print("Para generar tu código de 6 dígitos QR en pruebas, usa el TOTP Secret en un autenticador (o código Python con pyotp).")
+        print("Administrador    -> Cedula: 0987654321   | Pass: admin123")
+        print("Empleado         -> Cedula: 1712345678   | Pass: empleado123")
+        print("Talento Humano   -> Cedula: 1234567890   | Pass: talento123")
+        print("Oficial Riesgos  -> Cedula: 2345678901   | Pass: riesgos123")
+        print("Seguridad Fisica -> Cedula: 3456789012   | Pass: seguridad123")
+        print("Auditor Interno  -> Cedula: 4567890123   | Pass: auditor123")
+        print("Jefe de Agencia  -> Cedula: 5678901234   | Pass: jefe123")
+        print("Tecnico TI       -> Cedula: 6789012345   | Pass: tecnico123")
 
     except Exception as e:
         print(f"Error al poblar la base de datos: {e}")

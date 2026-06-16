@@ -10,7 +10,6 @@ import apiClient from '../services/api/apiClient';
 const SETTINGS_KEY = 'kw_system_config';
 const DEFAULT_CONFIG = {
   sessionTimeout: '30',
-  twoFactor: true,
   apiEndpoint: window.location.origin.replace('3000', '3001') || 'http://localhost:3001',
   logRetention: '90',
 };
@@ -163,17 +162,7 @@ const Settings = () => {
                   onChange={e => setConfig({ ...config, apiEndpoint: e.target.value })} className="form-input w-full font-mono" />
               </div>
             </div>
-            <div className="pt-4 border-t border-slate-200">
-              <label className="flex items-center gap-4 cursor-pointer p-4 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors">
-                <input type="checkbox" checked={config.twoFactor}
-                  onChange={e => setConfig({ ...config, twoFactor: e.target.checked })}
-                  className="w-5 h-5 rounded border-slate-300 text-[#84cc16] focus:ring-[#84cc16] cursor-pointer" />
-                <div>
-                  <span className="text-sm font-black text-slate-800 block">Autenticación de Dos Factores (2FA) Obligatoria</span>
-                  <span className="text-xs text-slate-500 font-medium">Exigir token OTP a todos los administradores al iniciar sesión.</span>
-                </div>
-              </label>
-            </div>
+
             <div className="pt-2 text-right">
               <button type="submit" className="btn-primary"><MdSave size={18} /> APLICAR CAMBIOS</button>
             </div>

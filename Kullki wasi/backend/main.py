@@ -9,7 +9,6 @@ import models
 import datetime
 import bcrypt
 import jwt
-import pyotp
 
 # Convierte un datetime naive (guardado en UTC) a string ISO 8601 con sufijo Z
 # para que JavaScript lo interprete correctamente como UTC y muestre la hora local del cliente
@@ -122,7 +121,6 @@ def get_db():
 class LoginRequest(BaseModel):
     cedula: str
     password: str
-    totpCode: Optional[str] = None
 
     @field_validator('cedula')
     @classmethod
@@ -848,7 +846,6 @@ def simular_escaneo(data: dict, db: Session = Depends(get_db)):
 
 @app.post("/api/v1/scan")
 def registrar_escaneo(data: dict, db: Session = Depends(get_db)):
-    totp_escaneado = data.get("totpCode")
     id_dispositivo = data.get("id_dispositivo", 1)
     disp = db.query(models.DispositivoEscaneo).filter(models.DispositivoEscaneo.id_dispositivo == id_dispositivo).first()
     if not disp or not disp.id_area:
@@ -857,23 +854,21 @@ def registrar_escaneo(data: dict, db: Session = Depends(get_db)):
     dni = data.get("dni")
     emp = db.query(models.Empleado).filter(models.Empleado.identificacion == dni).first()
     resultado = "DENEGADO"
-    motivo = "Empleado no encontrado o sin TOTP"
-    if emp and emp.totp_secret:
-        totp = pyotp.TOTP(emp.totp_secret)
-        if totp.verify(totp_escaneado):
-            tiene_permiso = False
-            for r in emp.roles:
-                for p in r.permisos:
-                    if p.id_permiso == area.id_permiso_requerido or p.codigo_permiso == "acceso_total":
-                        tiene_permiso = True
-                        break
-            if tiene_permiso:
-                resultado = "CONCEDIDO"
-                motivo = "Acceso autorizado"
-            else:
-                motivo = f"Falta permiso requerido para el área {area.nombre}"
+    motivo = "Empleado no encontrado"
+    if emp and emp.estado_laboral == "ACTIVO":
+        tiene_permiso = False
+        for r in emp.roles:
+            for p in r.permisos:
+                if p.id_permiso == area.id_permiso_requerido or p.codigo_permiso == "acceso_total":
+                    tiene_permiso = True
+                    break
+        if tiene_permiso:
+            resultado = "CONCEDIDO"
+            motivo = "Acceso autorizado"
         else:
-            motivo = "Código TOTP inválido o clonado"
+            motivo = f"Falta permiso requerido para el área {area.nombre}"
+    elif emp and emp.estado_laboral != "ACTIVO":
+        motivo = "Empleado inactivo"
     bitacora = models.BitacoraAcceso(
         id_empleado=emp.id_empleado if emp else None,
         id_area=area.id_area,

@@ -47,7 +47,6 @@ CREATE TABLE empleados (
   apellidos VARCHAR(100) NOT NULL,
   email VARCHAR(150) UNIQUE,
   password_hash VARCHAR(255),
-  totp_secret VARCHAR(255),
   estado_laboral VARCHAR(20) DEFAULT 'ACTIVO',
   creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (id_agencia_base) REFERENCES agencias(id_agencia) ON DELETE SET NULL
