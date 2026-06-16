@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import apiClient from '../services/api/apiClient';
 import Swal from 'sweetalert2';
 import { MdSearch, MdFileDownload, MdRefresh, MdPictureAsPdf, MdChevronLeft, MdChevronRight } from 'react-icons/md';
+import { useAuth } from '../context/AuthContext';
 
 const RISK_COLORS = {
   Alto:  'badge-inactive',
@@ -15,6 +16,7 @@ const STATUS_COLORS = {
 };
 
 const Logs = () => {
+  const { user } = useAuth();
   const [logs, setLogs]             = useState([]);
   const [agencies, setAgencies]     = useState([]);
   const [areas, setAreas]           = useState([]);
@@ -26,6 +28,12 @@ const Logs = () => {
   const [filterRisk, setRisk]       = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  // Resetear filtro manual cuando cambia la agencia global
+  useEffect(() => {
+    setAgency('ALL');
+    setCurrentPage(1);
+  }, [user?.agency]);
 
   const loadLogs = useCallback(async () => {
     setLoading(true);
@@ -50,6 +58,9 @@ const Logs = () => {
   // Todas las áreas del sistema (desde la DB, no solo las que aparecen en logs)
   const allAreas = areas.map(a => a.name).sort();
 
+  // Derivar agencia efectiva directamente de user.agency para reactividad garantizada
+  const effectiveAgency = filterAgency !== 'ALL' ? filterAgency : (user?.agency || 'ALL');
+
   const filtered = logs.filter(l => {
     const q = search.toLowerCase();
     const matchQ = (l.name     || '').toLowerCase().includes(q) ||
@@ -57,7 +68,7 @@ const Logs = () => {
                    (l.id       || '').toLowerCase().includes(q) ||
                    (l.area     || '').toLowerCase().includes(q);
     return matchQ
-      && (filterAgency === 'ALL' || l.agency === filterAgency)
+      && (effectiveAgency === 'ALL' || l.agency === effectiveAgency)
       && (filterArea   === 'ALL' || l.area   === filterArea)
       && (filterStatus === 'ALL' || l.status === filterStatus)
       && (filterRisk   === 'ALL' || l.risk   === filterRisk);

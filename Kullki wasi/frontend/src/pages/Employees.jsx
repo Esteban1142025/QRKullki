@@ -42,6 +42,11 @@ const Employees = () => {
   const [filterAgency, setFilterAgency] = useState('ALL');
   const [filterDept, setFilterDept]   = useState('ALL');
   const [filterStatus, setFilterStatus] = useState('ALL');
+
+  // Resetear filtro manual cuando el usuario cambia de agencia globalmente
+  useEffect(() => {
+    setFilterAgency('ALL');
+  }, [user?.agency]);
   const [showForm, setShowForm]       = useState(false);
   const [showQR, setShowQR]           = useState(false);
   const [editing, setEditing]         = useState(null);
@@ -183,13 +188,18 @@ const Employees = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // effectiveAgency se deriva DIRECTAMENTE de user.agency en cada render —
+  // garantiza reactividad inmediata al cambiar de agencia sin depender de sync de estado.
+  // filterAgency === 'ALL' significa "seguir el contexto global"; cualquier otro valor es override manual.
+  const effectiveAgency = filterAgency !== 'ALL' ? filterAgency : (user?.agency || 'ALL');
+
   const filtered = employees.filter(e => {
     const q = search.toLowerCase();
     const matchQ = (e.name || '').toLowerCase().includes(q) ||
                    (e.dni || '').includes(q) ||
                    (e.id || '').toLowerCase().includes(q);
     return matchQ
-      && (filterAgency === 'ALL' || e.agency === filterAgency)
+      && (effectiveAgency === 'ALL' || e.agency === effectiveAgency)
       && (filterDept   === 'ALL' || e.department === filterDept)
       && (filterStatus === 'ALL' || e.status === filterStatus);
   });
