@@ -150,6 +150,9 @@ const DashboardLayout = () => {
     || user?.agencyName
     || (user?.agency === 'MAT' ? 'Casa Matriz — Ambato' : `Sucursal ${user?.agency ?? ''}`);
 
+  const ROLES_CON_CAMBIO_AGENCIA = ['admin', 'talento_humano', 'riesgos', 'seguridad_fisica', 'auditor', 'tecnico_ti'];
+  const canSwitchAgency = ROLES_CON_CAMBIO_AGENCIA.includes(user?.role);
+
   return (
     <div 
       className="flex min-h-screen text-slate-800 overflow-hidden relative bg-[#0b1121]"
@@ -278,8 +281,9 @@ const DashboardLayout = () => {
               </span>
             </div>
 
-            {/* Agencia activa — switcher */}
+            {/* Agencia activa — switcher (solo roles con acceso multisucursal) */}
             <div className="relative hidden lg:block">
+              {canSwitchAgency ? (
               <button
                 onClick={() => { setShowAgencySwitcher(v => !v); setShowNotifications(false); setShowRoleSwitcher(false); }}
                 className="text-right leading-tight px-3 py-2 rounded-xl hover:bg-slate-100 border border-transparent hover:border-slate-200 transition-all group cursor-pointer"
@@ -291,9 +295,15 @@ const DashboardLayout = () => {
                 </p>
                 <p className="text-[13px] font-black text-[#84cc16] group-hover:text-[#65a30d] transition-colors">{agencyLabel}</p>
               </button>
+              ) : (
+              <div className="text-right leading-tight px-3 py-2">
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Agencia</p>
+                <p className="text-[13px] font-black text-[#84cc16]">{agencyLabel}</p>
+              </div>
+              )}
 
               <AnimatePresence>
-                {showAgencySwitcher && (
+                {canSwitchAgency && showAgencySwitcher && (
                   <motion.div
                     initial={{ opacity: 0, y: 8, scale: 0.96 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}

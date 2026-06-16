@@ -122,22 +122,25 @@ const DashboardAdmin = () => {
   const todayStr          = new Date().toDateString();
   const accessToday       = logs.filter(l => new Date(l.timestamp).toDateString() === todayStr).length;
 
-  // Gráfica horaria — datos reales del día actual agrupados por hora
+  // Gráfica horaria — rango dinámico según logs reales del día (mínimo 06:00–18:00)
+  const todayLogs = logs.filter(l => new Date(l.timestamp).toDateString() === todayStr);
+  const todayHours = todayLogs.map(l => new Date(l.timestamp).getHours());
+  const minH = todayHours.length > 0 ? Math.min(...todayHours, 6)  : 6;
+  const maxH = todayHours.length > 0 ? Math.max(...todayHours, 18) : 18;
+
   const hourBuckets = {};
-  for (let h = 6; h <= 18; h++) {
+  for (let h = minH; h <= maxH; h++) {
     const key = `${String(h).padStart(2, '0')}:00`;
     hourBuckets[key] = { time: key, Autorizados: 0, Denegados: 0 };
   }
-  logs
-    .filter(l => new Date(l.timestamp).toDateString() === todayStr)
-    .forEach(l => {
-      const h = new Date(l.timestamp).getHours();
-      if (h >= 6 && h <= 18) {
-        const key = `${String(h).padStart(2, '0')}:00`;
-        if (l.status === 'Autorizado') hourBuckets[key].Autorizados++;
-        else hourBuckets[key].Denegados++;
-      }
-    });
+  todayLogs.forEach(l => {
+    const h   = new Date(l.timestamp).getHours();
+    const key = `${String(h).padStart(2, '0')}:00`;
+    if (hourBuckets[key]) {
+      if (l.status === 'Autorizado') hourBuckets[key].Autorizados++;
+      else hourBuckets[key].Denegados++;
+    }
+  });
   const accessTimeData = Object.values(hourBuckets);
 
   const agencyData = agencies.map(a => ({
