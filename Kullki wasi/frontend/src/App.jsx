@@ -19,6 +19,8 @@ import Audit from './pages/Audit';
 import Security from './pages/Security';
 import Agencies from './pages/Agencies';
 import Settings from './pages/Settings';
+import Profile from './pages/Profile';
+import Events from './pages/Events';
 
 function App() {
   return (
@@ -56,13 +58,13 @@ function App() {
             } />
 
             <Route path="qr-scanner" element={
-              <ProtectedRoute allowedRoles={['admin', 'seguridad_fisica', 'jefe_agencia', 'tecnico_ti']} allowedPermission="acceso_total">
+              <ProtectedRoute allowedRoles={['admin', 'seguridad_fisica', 'jefe_agencia', 'tecnico_ti']} allowedPermission="modulo_control_qr">
                 <QRScanner />
               </ProtectedRoute>
             } />
 
             <Route path="restricted-areas" element={
-              <ProtectedRoute allowedRoles={['admin', 'riesgos', 'seguridad_fisica']} allowedPermission="acceso_boveda">
+              <ProtectedRoute allowedRoles={['admin', 'riesgos', 'seguridad_fisica']} allowedPermission="modulo_areas_criticas">
                 <RestrictedAreas />
               </ProtectedRoute>
             } />
@@ -74,13 +76,13 @@ function App() {
             } />
 
             <Route path="audit" element={
-              <ProtectedRoute allowedRoles={['admin', 'auditor']} allowedPermission="acceso_archivo">
+              <ProtectedRoute allowedRoles={['admin', 'auditor']} allowedPermission="modulo_auditoria">
                 <Audit />
               </ProtectedRoute>
             } />
 
             <Route path="security" element={
-              <ProtectedRoute allowedRoles={['admin', 'riesgos', 'seguridad_fisica']} allowedPermission="acceso_boveda">
+              <ProtectedRoute allowedRoles={['admin', 'riesgos', 'seguridad_fisica']} allowedPermission="modulo_areas_criticas">
                 <Security />
               </ProtectedRoute>
             } />
@@ -88,6 +90,18 @@ function App() {
             <Route path="agencies" element={
               <ProtectedRoute allowedRoles={['admin', 'jefe_agencia']}>
                 <Agencies />
+              </ProtectedRoute>
+            } />
+
+            <Route path="profile" element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            } />
+
+            <Route path="events" element={
+              <ProtectedRoute allowedRoles={['admin']} allowedPermission="all">
+                <Events />
               </ProtectedRoute>
             } />
 

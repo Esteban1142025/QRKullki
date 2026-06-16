@@ -43,28 +43,62 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
-const KPICard = ({ label, value, sub, subColor = 'text-slate-500', icon: Icon, iconBg, iconColor, trend, trendUp }) => (
-  <div className="card-corporate p-8 flex items-center justify-between cursor-default">
-    <div className="space-y-1.5">
-      <div className="flex items-center gap-2">
-        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{label}</span>
-        {trend && (
-          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full flex items-center gap-0.5 ${trendUp ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-            {trend} {trendUp ? '↑' : '↓'}
+const KPICard = ({ label, value, sub, subColor = 'text-slate-500', icon: Icon, iconBg, iconColor, trend, trendUp, to, canAccess }) => {
+  const inner = (
+    <>
+      <div className="space-y-1.5 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{label}</span>
+          {trend && (
+            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full flex items-center gap-0.5 ${trendUp ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+              {trend} {trendUp ? '↑' : '↓'}
+            </span>
+          )}
+        </div>
+        <div className="text-5xl font-extrabold text-slate-800 font-['Outfit']">{value}</div>
+        <span className={`text-[11px] font-bold ${subColor}`}>{sub}</span>
+      </div>
+      <div className="flex flex-col items-end gap-2 shrink-0">
+        <div className={`w-12 h-12 rounded-xl ${iconBg} flex items-center justify-center ${iconColor}`}>
+          <Icon size={26} />
+        </div>
+        {canAccess && (
+          <span className="text-[9px] font-bold text-slate-400 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            Ver módulo <MdArrowForward size={10} />
           </span>
         )}
       </div>
-      <div className="text-5xl font-extrabold text-slate-800 font-['Outfit']">{value}</div>
-      <span className={`text-[11px] font-bold ${subColor}`}>{sub}</span>
+    </>
+  );
+
+  if (canAccess && to) {
+    return (
+      <Link to={to} className="card-corporate p-8 flex items-center justify-between group hover:shadow-lg hover:border-[#84cc16]/40 hover:-translate-y-0.5 transition-all cursor-pointer">
+        {inner}
+      </Link>
+    );
+  }
+  return (
+    <div className="card-corporate p-8 flex items-center justify-between cursor-default">
+      {inner}
     </div>
-    <div className={`w-12 h-12 rounded-xl ${iconBg} flex items-center justify-center ${iconColor} shrink-0`}>
-      <Icon size={26} />
-    </div>
-  </div>
-);
+  );
+};
 
 const DashboardAdmin = () => {
   const { user } = useAuth();
+
+  // Comprueba si el usuario puede acceder a un módulo (igual que ProtectedRoute + sidebar)
+  const perms       = user?.permissions || [];
+  const role        = user?.role || '';
+  const isSuperUser = perms.includes('all');
+  const canAccess   = (allowedRoles, allowedPermission) => {
+    if (isSuperUser) return true;
+    if (allowedRoles?.includes(role)) return true;
+    if (allowedPermission && perms.includes(allowedPermission)) return true;
+    return false;
+  };
+
   const [employees, setEmployees] = useState([]);
   const [agencies, setAgencies] = useState([]);
   const [alerts, setAlerts] = useState([]);
@@ -144,6 +178,8 @@ const DashboardAdmin = () => {
           icon={MdSupervisedUserCircle}
           iconBg="bg-[#8DC63F]/10"
           iconColor="text-[#8DC63F]"
+          to="/employees"
+          canAccess={canAccess(['admin', 'talento_humano'], 'gestionar_usuarios')}
         />
         <KPICard
           label="Agencias Activas"
@@ -154,6 +190,8 @@ const DashboardAdmin = () => {
           iconBg="bg-blue-500/10"
           iconColor="text-blue-400"
           trend="Estable" trendUp={true}
+          to="/agencies"
+          canAccess={canAccess(['admin', 'jefe_agencia'], null)}
         />
         <KPICard
           label="Credenciales Emitidas"
@@ -163,6 +201,8 @@ const DashboardAdmin = () => {
           icon={MdBadge}
           iconBg="bg-orange-500/10"
           iconColor="text-orange-400"
+          to="/qr-scanner"
+          canAccess={canAccess(['admin', 'seguridad_fisica', 'jefe_agencia', 'tecnico_ti'], 'modulo_control_qr')}
         />
         <KPICard
           label="Alertas Activas"
@@ -172,6 +212,8 @@ const DashboardAdmin = () => {
           icon={activeAlerts > 0 ? MdWarning : MdCheckCircle}
           iconBg={activeAlerts > 0 ? 'bg-red-500/10' : 'bg-emerald-500/10'}
           iconColor={activeAlerts > 0 ? 'text-red-400' : 'text-emerald-400'}
+          to="/security"
+          canAccess={canAccess(['admin', 'riesgos', 'seguridad_fisica'], 'modulo_areas_criticas')}
         />
       </div>
 

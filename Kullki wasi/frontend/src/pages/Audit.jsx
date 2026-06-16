@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import {
   MdVerifiedUser, MdCheckCircle, MdSecurity, MdAssessment,
   MdPlayCircleFilled, MdClose, MdWarning, MdAssignmentLate,
   MdHistory, MdPictureAsPdf, MdDescription, MdLightbulbOutline,
-  MdTimeline
+  MdTimeline, MdArrowForward, MdShield, MdCancel,
 } from 'react-icons/md';
+import { readEvents } from '../utils/eventLogger';
 
 // Mock Data
 const MOCK_FINDINGS = {
@@ -13,14 +15,6 @@ const MOCK_FINDINGS = {
   pending: 1,
   critical: 0
 };
-
-const MOCK_EVENTS = [
-  { id: 1, time: '10:45 AM', action: 'Inicio de sesión administrativo', user: 'Admin' },
-  { id: 2, time: '09:30 AM', action: 'Actualización de políticas', user: 'Oficial de Cumplimiento' },
-  { id: 3, time: 'Ayer', action: 'Generación de reportes', user: 'Auditor Externo' },
-  { id: 4, time: 'Ayer', action: 'Cambio de permisos', user: 'Admin' },
-  { id: 5, time: 'Ayer', action: 'Activación de locks de emergencia (Prueba)', user: 'Oficial Riesgos' }
-];
 
 const MOCK_HISTORY = [
   { id: 1, date: '01/06/2026', responsible: 'Auditor Interno', result: '98.5%', status: 'Aprobado' },
@@ -45,10 +39,27 @@ const MOCK_RECOMMENDATIONS = [
   "Revisar permisos asignados a nuevos roles dinámicos."
 ];
 
+const fmtEvent = (iso) => {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffDays = Math.floor((now - d) / 86400000);
+  if (diffDays === 0) return d.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit', hour12: false });
+  if (diffDays === 1) return 'Ayer';
+  return d.toLocaleDateString('es-EC', { day: '2-digit', month: 'short' });
+};
+
 const Audit = () => {
   const [showReport, setShowReport] = useState(false);
   const [auditReport, setAuditReport] = useState(null);
   const [runningAudit, setRunningAudit] = useState(false);
+  const [recentEvents, setRecentEvents] = useState([]);
+
+  useEffect(() => {
+    const load = () => setRecentEvents(readEvents().slice(0, 5));
+    load();
+    const t = setInterval(load, 10000);
+    return () => clearInterval(t);
+  }, []);
 
   const runSystemAudit = () => {
     setRunningAudit(true);
@@ -266,23 +277,42 @@ const Audit = () => {
               </div>
            </div>
 
-           {/* Eventos Recientes */}
+           {/* Eventos Recientes — datos reales desde kw_perm_events */}
            <div className="card-corporate p-6">
               <h3 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
-                <MdHistory className="text-blue-500" size={20}/> 
+                <MdHistory className="text-blue-500" size={20}/>
                 Eventos Recientes
               </h3>
-              <div className="space-y-4">
-                {MOCK_EVENTS.map((event, i) => (
-                  <div key={i} className="flex gap-3">
-                    <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 shrink-0"></div>
-                    <div>
-                      <p className="text-xs font-medium text-slate-700">{event.action}</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5 font-mono">{event.time} • {event.user}</p>
+              {recentEvents.length > 0 ? (
+                <div className="space-y-3.5">
+                  {recentEvents.map((evt) => (
+                    <div key={evt.id} className="flex gap-3">
+                      <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${evt.action === 'granted' ? 'bg-emerald-500' : 'bg-red-400'}`} />
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-slate-700 leading-snug truncate">
+                          {evt.action === 'granted' ? 'Permiso otorgado: ' : 'Permiso revocado: '}
+                          <span className="font-bold">{evt.permissionLabel}</span>
+                        </p>
+                        <p className="text-[10px] text-slate-500 mt-0.5 font-mono">
+                          {fmtEvent(evt.timestamp)} · {evt.roleName} · {evt.by}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-6 text-center text-xs text-slate-400 font-medium space-y-1">
+                  <MdShield size={28} className="mx-auto opacity-20 mb-2" />
+                  Sin eventos registrados aún.
+                  <p className="text-[10px] text-slate-300">Los cambios de permisos en Roles y Permisos aparecerán aquí.</p>
+                </div>
+              )}
+              <Link
+                to="/events"
+                className="mt-4 flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl text-xs font-bold text-[#65a30d] border border-[#84cc16]/40 bg-[#84cc16]/8 hover:bg-[#84cc16]/15 transition-all"
+              >
+                Ver todos los eventos <MdArrowForward size={14} />
+              </Link>
            </div>
 
            {/* Recomendaciones Automáticas */}

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../services/api/apiClient';
+import { agencyKey } from '../utils/agencyStorage';
 
 const AuthContext = createContext(null);
 
@@ -24,11 +25,15 @@ export const AuthProvider = ({ children }) => {
       try {
         const parsed = JSON.parse(storedUser);
         setUser(parsed);
-        // Refrescar permisos desde la BD en background (por si cambiaron en RBAC)
+        // Refrescar permisos y datos de agencia desde la BD en background
         apiClient.get(`/auth/permissions/${parsed.dni}`)
           .then(res => {
-            const freshPerms = res.data.permissions;
-            const updated = { ...parsed, permissions: freshPerms };
+            const updated = {
+              ...parsed,
+              permissions: res.data.permissions,
+              // Actualizar el nombre de la agencia desde BD (sin pisar un switch manual)
+              agencyName: res.data.agencyName || parsed.agencyName,
+            };
             localStorage.setItem('kw_user', JSON.stringify(updated));
             setUser(updated);
           })
@@ -72,7 +77,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('kw_token', token);
       setUser(sessionUser);
 
-      // Registrar bitácora de login localmente (opcional o usar el backend luego)
+      // Registrar bitácora de login — aislada por agencia
       const loginLog = {
         id: `LOG-${Date.now()}`,
         timestamp: new Date().toISOString(),
@@ -86,8 +91,9 @@ export const AuthProvider = ({ children }) => {
         details: `Inicio de sesión web exitoso.`,
         risk: "Bajo"
       };
-      const currentLogs = JSON.parse(localStorage.getItem('kw_dynamic_logs') || '[]');
-      localStorage.setItem('kw_dynamic_logs', JSON.stringify([loginLog, ...currentLogs]));
+      const logKey = agencyKey('kw_dynamic_logs', sessionUser.agency);
+      const currentLogs = JSON.parse(localStorage.getItem(logKey) || '[]');
+      localStorage.setItem(logKey, JSON.stringify([loginLog, ...currentLogs]));
 
       return sessionUser;
     } catch (error) {
@@ -116,8 +122,14 @@ export const AuthProvider = ({ children }) => {
     return user.permissions.includes(permission);
   };
 
+  const switchAgency = (agencyId, agencyName) => {
+    const updated = { ...user, agency: agencyId, agencyDisplayName: agencyName };
+    localStorage.setItem('kw_user', JSON.stringify(updated));
+    setUser(updated);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, loginAsRole, logout, hasPermission }}>
+    <AuthContext.Provider value={{ user, loading, login, loginAsRole, logout, hasPermission, switchAgency }}>
       {children}
     </AuthContext.Provider>
   );

@@ -182,8 +182,10 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     )
     rol_principal = roles[0] if roles else "empleado"
     agencia_codigo = "MAT"
+    agencia_nombre = "Casa Matriz — Ambato"
     if emp.agencia_base:
         agencia_codigo = emp.agencia_base.codigo or "MAT"
+        agencia_nombre = emp.agencia_base.nombre or "Casa Matriz — Ambato"
 
     return {
         "token": access_token,
@@ -196,6 +198,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
             "permissions": list(set(permisos)),
             "roleName": rol_principal.replace("_", " ").title(),
             "agency": agencia_codigo,
+            "agencyName": agencia_nombre,
             "status": emp.estado_laboral
         }
     }
@@ -389,7 +392,16 @@ def get_permissions_by_cedula(cedula: str, db: Session = Depends(get_db)):
     for r in emp.roles:
         for p in r.permisos:
             permisos.append(p.codigo_permiso)
-    return {"permissions": list(set(permisos))}
+    agencia_codigo = "MAT"
+    agencia_nombre = "Casa Matriz — Ambato"
+    if emp.agencia_base:
+        agencia_codigo = emp.agencia_base.codigo or "MAT"
+        agencia_nombre = emp.agencia_base.nombre or "Casa Matriz — Ambato"
+    return {
+        "permissions": list(set(permisos)),
+        "agency": agencia_codigo,
+        "agencyName": agencia_nombre,
+    }
 
 # --- Empleados ---
 

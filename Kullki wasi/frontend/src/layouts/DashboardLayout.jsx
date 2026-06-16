@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import apiClient from '../services/api/apiClient';
+import { agencyKey } from '../utils/agencyStorage';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   MdDashboard,
@@ -21,7 +23,9 @@ import {
   MdLayers,
   MdSwapHoriz,
   MdClose,
-  MdShield
+  MdShield,
+  MdPerson,
+  MdEventNote,
 } from 'react-icons/md';
 
 // roles: acceso por rol (hardcoded). permission: código de permiso en BD que TAMBIÉN otorga acceso.
@@ -30,26 +34,30 @@ const MENU_ITEMS = [
   { label: 'Dashboard',         path: '/dashboard',        icon: MdDashboard,     roles: [],                                                           permission: null              },
   { label: 'Colaboradores',     path: '/employees',        icon: MdPeople,        roles: ['admin', 'talento_humano'],                                  permission: 'gestionar_usuarios' },
   { label: 'Roles y Permisos',  path: '/rbac',             icon: MdLayers,        roles: ['admin'],                                                    permission: 'all'             },
-  { label: 'Control QR',        path: '/qr-scanner',       icon: MdQrCodeScanner, roles: ['admin', 'seguridad_fisica', 'jefe_agencia', 'tecnico_ti'],  permission: 'acceso_total'    },
-  { label: 'Áreas Críticas',    path: '/restricted-areas', icon: MdShield,        roles: ['admin', 'riesgos', 'seguridad_fisica'],                     permission: 'acceso_boveda'   },
-  { label: 'Bitácora',          path: '/logs',             icon: MdHistory,       roles: ['admin', 'riesgos', 'auditor', 'tecnico_ti'],                permission: 'ver_reportes'    },
-  { label: 'Auditoría',         path: '/audit',            icon: MdVerifiedUser,  roles: ['admin', 'auditor'],                                         permission: 'acceso_archivo'  },
-  { label: 'Alertas',           path: '/security',         icon: MdWarning,       roles: ['admin', 'riesgos', 'seguridad_fisica'],                     permission: 'acceso_boveda'   },
+  { label: 'Control QR',        path: '/qr-scanner',       icon: MdQrCodeScanner, roles: ['admin', 'seguridad_fisica', 'jefe_agencia', 'tecnico_ti'],  permission: 'modulo_control_qr'      },
+  { label: 'Áreas Críticas',    path: '/restricted-areas', icon: MdShield,        roles: ['admin', 'riesgos', 'seguridad_fisica'],                     permission: 'modulo_areas_criticas'  },
+  { label: 'Bitácora',          path: '/logs',             icon: MdHistory,       roles: ['admin', 'riesgos', 'auditor', 'tecnico_ti'],                permission: 'ver_reportes'           },
+  { label: 'Auditoría',         path: '/audit',            icon: MdVerifiedUser,  roles: ['admin', 'auditor'],                                         permission: 'modulo_auditoria'       },
+  { label: 'Alertas',           path: '/security',         icon: MdWarning,       roles: ['admin', 'riesgos', 'seguridad_fisica'],                     permission: 'modulo_areas_criticas'  },
+  { label: 'Eventos',           path: '/events',           icon: MdEventNote,     roles: ['admin'],                                                    permission: 'all'             },
   { label: 'Agencias',          path: '/agencies',         icon: MdStore,         roles: ['admin', 'jefe_agencia'],                                    permission: null              },
+  { label: 'Mi Perfil',         path: '/profile',          icon: MdPerson,        roles: [],                                                           permission: null              },
   { label: 'Configuración',     path: '/settings',         icon: MdSettings,      roles: ['admin'],                                                    permission: 'all'             },
 ];
 
 const DashboardLayout = () => {
-  const { user, logout, loginAsRole } = useAuth();
+  const { user, logout, loginAsRole, switchAgency } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [isCollapsed, setIsCollapsed]         = useState(false);
-  const [mobileOpen, setMobileOpen]           = useState(false);
-  const [currentTime, setCurrentTime]         = useState(new Date());
-  const [showRoleSwitcher, setShowRoleSwitcher] = useState(false);
+  const [isCollapsed, setIsCollapsed]             = useState(false);
+  const [mobileOpen, setMobileOpen]               = useState(false);
+  const [currentTime, setCurrentTime]             = useState(new Date());
+  const [showRoleSwitcher, setShowRoleSwitcher]   = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState([]);
+  const [showAgencySwitcher, setShowAgencySwitcher] = useState(false);
+  const [activeAgencies, setActiveAgencies]       = useState([]);
+  const [notifications, setNotifications]         = useState([]);
 
   // Reloj institucional en tiempo real
   useEffect(() => {
@@ -57,11 +65,18 @@ const DashboardLayout = () => {
     return () => clearInterval(t);
   }, []);
 
-  // Cargar notificaciones dinámicas
+  // Cargar agencias activas para el switcher
+  useEffect(() => {
+    apiClient.get('/agencias')
+      .then(res => setActiveAgencies(res.data.filter(a => a.status === 'Activo')))
+      .catch(() => {});
+  }, []);
+
+  // Cargar notificaciones dinámicas — aisladas por agencia
   useEffect(() => {
     const loadNotifications = () => {
       try {
-        const alerts = JSON.parse(localStorage.getItem('kw_dynamic_alerts') || '[]');
+        const alerts = JSON.parse(localStorage.getItem(agencyKey('kw_dynamic_alerts', user?.agency)) || '[]');
         const unread = alerts.filter(a => !a.isResolved).map(a => ({
           id: a.id,
           text: a.details || a.type,
@@ -74,13 +89,14 @@ const DashboardLayout = () => {
     loadNotifications();
     const interval = setInterval(loadNotifications, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user?.agency]);
 
   const markAsRead = (id) => {
     try {
-      const alerts = JSON.parse(localStorage.getItem('kw_dynamic_alerts') || '[]');
+      const key = agencyKey('kw_dynamic_alerts', user?.agency);
+      const alerts = JSON.parse(localStorage.getItem(key) || '[]');
       const updated = alerts.map(a => a.id === id ? { ...a, isResolved: true, resolvedBy: user?.name, status: 'Resuelto' } : a);
-      localStorage.setItem('kw_dynamic_alerts', JSON.stringify(updated));
+      localStorage.setItem(key, JSON.stringify(updated));
       setNotifications(notifications.filter(n => n.id !== id));
     } catch (e) {}
   };
@@ -105,6 +121,7 @@ const DashboardLayout = () => {
     setMobileOpen(false);
     setShowNotifications(false);
     setShowRoleSwitcher(false);
+    setShowAgencySwitcher(false);
   }, [location.pathname]);
 
   const userPerms = user?.permissions || [];
@@ -125,9 +142,11 @@ const DashboardLayout = () => {
   const activeLabel = MENU_ITEMS.find(i => i.path === location.pathname)?.label ?? 'Detalle';
   const breadcrumb  = location.pathname === '/dashboard' ? 'Panel Principal' : activeLabel;
 
-  const agencyLabel = user?.agency === 'MAT'
-    ? 'Casa Matriz — Ambato'
-    : `Sucursal ${user?.agency ?? ''}`;
+  const currentAgency = activeAgencies.find(a => a.id === user?.agency);
+  const agencyLabel = user?.agencyDisplayName
+    || currentAgency?.name
+    || user?.agencyName
+    || (user?.agency === 'MAT' ? 'Casa Matriz — Ambato' : `Sucursal ${user?.agency ?? ''}`);
 
   return (
     <div 
@@ -169,21 +188,21 @@ const DashboardLayout = () => {
           </button>
         </div>
 
-        {/* User Avatar */}
+        {/* User Avatar — sidebar desktop */}
         <div className="p-3.5 border-b border-white/10 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className={`rounded-full flex items-center justify-center font-bold text-slate-900 bg-gradient-to-br from-[#84cc16] to-[#facc15] border border-white/20 transition-all shrink-0 shadow-[0_0_15px_rgba(132,204,34,0.3)] ${isCollapsed ? 'w-10 h-10 text-sm' : 'w-12 h-12 text-xl'}`}>
+          <Link to="/profile" className="flex items-center gap-3 group" title="Editar perfil">
+            <div className={`rounded-full flex items-center justify-center font-bold text-slate-900 bg-gradient-to-br from-[#84cc16] to-[#facc15] border border-white/20 transition-all shrink-0 shadow-[0_0_15px_rgba(132,204,34,0.3)] group-hover:scale-105 group-hover:shadow-[0_0_20px_rgba(132,204,34,0.5)] ${isCollapsed ? 'w-10 h-10 text-sm' : 'w-12 h-12 text-xl'}`}>
               {user?.name?.charAt(0) || 'U'}
             </div>
             {!isCollapsed && (
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold text-white truncate leading-snug">{user?.name}</p>
+                <p className="text-sm font-bold text-white truncate leading-snug group-hover:text-[#84cc16] transition-colors">{user?.name}</p>
                 <span className="inline-block mt-0.5 text-[10px] px-2 py-0.5 rounded border border-[#84cc16]/40 bg-[#84cc16]/10 text-[#84cc16] font-bold uppercase tracking-wider">
                   {user?.roleName}
                 </span>
               </div>
             )}
-          </div>
+          </Link>
         </div>
 
         {/* Navigation */}
@@ -257,10 +276,66 @@ const DashboardLayout = () => {
               </span>
             </div>
 
-            {/* Agencia activa */}
-            <div className="hidden lg:block text-right leading-tight mr-2">
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Agencia</p>
-              <p className="text-[13px] font-black text-[#84cc16]">{agencyLabel}</p>
+            {/* Agencia activa — switcher */}
+            <div className="relative hidden lg:block">
+              <button
+                onClick={() => { setShowAgencySwitcher(v => !v); setShowNotifications(false); setShowRoleSwitcher(false); }}
+                className="text-right leading-tight px-3 py-2 rounded-xl hover:bg-slate-100 border border-transparent hover:border-slate-200 transition-all group cursor-pointer"
+                title="Cambiar agencia"
+              >
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest flex items-center justify-end gap-1">
+                  Agencia
+                  <MdSwapHoriz size={13} className="text-slate-400 group-hover:text-[#84cc16] transition-colors" />
+                </p>
+                <p className="text-[13px] font-black text-[#84cc16] group-hover:text-[#65a30d] transition-colors">{agencyLabel}</p>
+              </button>
+
+              <AnimatePresence>
+                {showAgencySwitcher && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden z-50"
+                  >
+                    <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <MdSwapHoriz size={14} className="text-[#84cc16]" /> Cambiar Agencia
+                      </span>
+                      <button onClick={() => setShowAgencySwitcher(false)} className="text-slate-400 hover:text-slate-600">
+                        <MdClose size={14} />
+                      </button>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto py-1.5">
+                      {activeAgencies.length > 0 ? activeAgencies.map(ag => {
+                        const isActive = ag.id === user?.agency;
+                        return (
+                          <button
+                            key={ag.id}
+                            onClick={() => { switchAgency(ag.id, ag.name); setShowAgencySwitcher(false); }}
+                            className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center justify-between gap-3 ${isActive ? 'bg-[#84cc16]/5' : ''}`}
+                          >
+                            <div className="min-w-0">
+                              <p className={`text-xs font-bold truncate ${isActive ? 'text-[#65a30d]' : 'text-slate-700'}`}>{ag.name}</p>
+                              <p className="text-[10px] text-slate-400 font-mono mt-0.5">{ag.id} · {ag.type}</p>
+                            </div>
+                            {isActive && (
+                              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#84cc16]/15 text-[#65a30d] border border-[#84cc16]/30 shrink-0">
+                                ACTIVA
+                              </span>
+                            )}
+                          </button>
+                        );
+                      }) : (
+                        <div className="px-4 py-6 text-center text-xs text-slate-400 font-medium">
+                          No hay agencias activas disponibles.
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Notificaciones */}
@@ -323,14 +398,16 @@ const DashboardLayout = () => {
             </div>
 
             {/* Avatar / Perfil desktop */}
-            <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-slate-900 bg-gradient-to-br from-[#8DC63F] to-[#facc15] shadow-sm hidden md:flex shrink-0">
+            <Link to="/profile" title="Editar perfil"
+              className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-slate-900 bg-gradient-to-br from-[#8DC63F] to-[#facc15] shadow-sm hidden md:flex shrink-0 hover:scale-110 hover:shadow-md transition-all cursor-pointer">
               {user?.name?.charAt(0) || 'U'}
-            </div>
+            </Link>
 
             {/* Avatar móvil */}
-            <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-slate-900 bg-gradient-to-br from-[#8DC63F] to-[#facc15] shadow-sm md:hidden shrink-0">
+            <Link to="/profile" title="Editar perfil"
+              className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-slate-900 bg-gradient-to-br from-[#8DC63F] to-[#facc15] shadow-sm md:hidden shrink-0 hover:scale-110 transition-all cursor-pointer">
               {user?.name?.charAt(0) || 'U'}
-            </div>
+            </Link>
           </div>
         </header>
 
@@ -375,15 +452,15 @@ const DashboardLayout = () => {
                 </button>
               </div>
               <div className="p-3.5 border-b border-slate-300/60 shrink-0 bg-slate-50/50">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-slate-900 bg-gradient-to-br from-[#8DC63F] to-[#facc15] shadow-sm shrink-0">
+                <Link to="/profile" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 group" title="Editar perfil">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-slate-900 bg-gradient-to-br from-[#8DC63F] to-[#facc15] shadow-sm shrink-0 group-hover:scale-105 transition-transform">
                     {user?.name?.charAt(0) || 'U'}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-slate-800 truncate">{user?.name}</p>
+                    <p className="text-xs font-bold text-slate-800 truncate group-hover:text-[#65a30d] transition-colors">{user?.name}</p>
                     <span className="text-[9px] text-[#79ac34] font-black uppercase">{user?.roleName}</span>
                   </div>
-                </div>
+                </Link>
               </div>
               <nav className="flex-1 px-2.5 py-3 space-y-0.5 overflow-y-auto">
                 {filteredMenu.map(({ label, path, icon: Icon }) => (

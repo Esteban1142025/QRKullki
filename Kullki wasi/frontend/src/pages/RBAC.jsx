@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../services/api/apiClient';
 import Swal from 'sweetalert2';
 import {
   MdSecurity, MdCheckCircle, MdCancel, MdSave, MdInfoOutline,
-  MdLockOpen, MdShield, MdRefresh
+  MdLockOpen, MdShield, MdRefresh, MdApps, MdDoorFront
 } from 'react-icons/md';
+import { logPermissionChanges } from '../utils/eventLogger';
 
-// Metadatos visuales de cada rol (no provienen de DB, son constantes de UI)
+// Metadatos visuales de cada rol
 const ROLE_DISPLAY = {
   admin:           { displayName: 'Administrador General',    description: 'Acceso total y configuración del sistema' },
   talento_humano:  { displayName: 'Talento Humano',           description: 'Gestión de empleados, permisos laborales y reportes' },
@@ -19,38 +20,115 @@ const ROLE_DISPLAY = {
   empleado:        { displayName: 'Empleado',                 description: 'Consulta de permisos propios y descarga de credencial QR' },
 };
 
-// IDs deben coincidir EXACTAMENTE con codigo_permiso en la tabla permisos de la BD
-const PERMISSIONS = [
-  { id: 'all',                label: 'Acceso Total (SuperAdmin)',        category: 'Sistema'   },
-  { id: 'acceso_total',       label: 'Acceso Total a Áreas Restringidas',category: 'Accesos'   },
-  { id: 'gestionar_usuarios', label: 'Gestionar Colaboradores',          category: 'Personal'  },
-  { id: 'ver_reportes',       label: 'Ver Reportes de Accesos',          category: 'Auditoría' },
-  { id: 'acceso_boveda',      label: 'Acceso a la Bóveda Principal',     category: 'Seguridad' },
-  { id: 'acceso_cajas',       label: 'Acceso al Área de Cajas',          category: 'Accesos'   },
-  { id: 'acceso_servidores',  label: 'Acceso al Cuarto de Servidores',   category: 'Accesos'   },
-  { id: 'acceso_archivo',     label: 'Acceso al Archivo General',        category: 'Auditoría' },
+// ── Sección 1: Permisos de módulos del sistema ────────────────────────────────
+// Controlan qué módulos del panel lateral puede ver y acceder cada rol
+const MODULE_PERMISSIONS = [
+  {
+    id: 'all',
+    label: 'Super Administrador',
+    desc: 'Acceso completo a todos los módulos, configuración y ajustes del sistema.',
+    category: 'Sistema',
+    categoryStyle: 'text-red-700 bg-red-100 border-red-200',
+  },
+  {
+    id: 'gestionar_usuarios',
+    label: 'Módulo: Colaboradores',
+    desc: 'Permite ver, crear y editar expedientes de empleados de la cooperativa.',
+    category: 'Gestión',
+    categoryStyle: 'text-blue-700 bg-blue-100 border-blue-200',
+  },
+  {
+    id: 'ver_reportes',
+    label: 'Módulo: Bitácora',
+    desc: 'Acceso al historial completo de registros de entrada y salida del personal.',
+    category: 'Reportes',
+    categoryStyle: 'text-violet-700 bg-violet-100 border-violet-200',
+  },
+  {
+    id: 'modulo_areas_criticas',
+    label: 'Módulo: Áreas Críticas y Alertas',
+    desc: 'Monitoreo de zonas de alto riesgo, gestión de incidentes y alertas de seguridad.',
+    category: 'Seguridad',
+    categoryStyle: 'text-orange-700 bg-orange-100 border-orange-200',
+  },
+  {
+    id: 'modulo_auditoria',
+    label: 'Módulo: Auditoría',
+    desc: 'Trazabilidad completa de eventos institucionales y herramientas de auditoría interna.',
+    category: 'Auditoría',
+    categoryStyle: 'text-purple-700 bg-purple-100 border-purple-200',
+  },
+  {
+    id: 'modulo_control_qr',
+    label: 'Módulo: Control QR',
+    desc: 'Operación del escáner de acceso QR para validar entradas y salidas en garita.',
+    category: 'Accesos',
+    categoryStyle: 'text-[#65a30d] bg-[#84cc16]/15 border-[#84cc16]/30',
+  },
 ];
 
-const CATEGORY_COLORS = {
-  Sistema:   'text-red-600 bg-red-100 border-red-200',
-  Personal:  'text-blue-600 bg-blue-100 border-blue-200',
-  Auditoría: 'text-purple-600 bg-purple-100 border-purple-200',
-  Seguridad: 'text-orange-600 bg-orange-100 border-orange-200',
-  Accesos:   'text-[#65a30d] bg-[#84cc16]/20 border-[#84cc16]/30',
-};
+// ── IDs reales de acceso a áreas físicas ─────────────────────────────────────
+const REAL_AREA_IDS = ['acceso_boveda', 'acceso_cajas', 'acceso_servidores', 'acceso_archivo', 'acceso_total'];
+
+// ── Sección 2: Permisos de acceso físico a áreas ──────────────────────────────
+// Controlan a qué áreas físicas de la agencia puede ingresar el colaborador via QR
+// '__all_areas__' es un ID de UI solamente — activa/desactiva todos los REAL_AREA_IDS a la vez
+const AREA_PERMISSIONS = [
+  {
+    id: '__all_areas__',
+    isSelectAll: true,
+    label: 'Acceso a Todas las Áreas',
+    desc: 'Ingreso irrestricto a cualquier área física de la agencia. Activa o desactiva todos los accesos de esta sección a la vez.',
+    category: 'Máximo Nivel',
+    categoryStyle: 'text-orange-700 bg-orange-100 border-orange-200',
+  },
+  {
+    id: 'acceso_boveda',
+    label: 'Bóveda Principal',
+    desc: 'Área blindada de resguardo de valores, efectivo y documentos de alta seguridad.',
+    category: 'Alta Seguridad',
+    categoryStyle: 'text-red-700 bg-red-100 border-red-200',
+  },
+  {
+    id: 'acceso_cajas',
+    label: 'Área de Cajas',
+    desc: 'Ventanillas de atención al cliente, operaciones financieras y transacciones en efectivo.',
+    category: 'Operaciones',
+    categoryStyle: 'text-blue-700 bg-blue-100 border-blue-200',
+  },
+  {
+    id: 'acceso_servidores',
+    label: 'Cuarto de Servidores TI',
+    desc: 'Infraestructura tecnológica, equipos de red, servidores y comunicaciones.',
+    category: 'Tecnología',
+    categoryStyle: 'text-cyan-700 bg-cyan-100 border-cyan-200',
+  },
+  {
+    id: 'acceso_archivo',
+    label: 'Archivo e Histórico',
+    desc: 'Sala de documentos institucionales, expedientes físicos y registros históricos.',
+    category: 'Administración',
+    categoryStyle: 'text-purple-700 bg-purple-100 border-purple-200',
+  },
+];
 
 const RBAC = () => {
   const { user } = useAuth();
-  const [rolesData, setRolesData]       = useState({});  // { roleName: { id_rol, name, displayName, permissions: [] } }
+  const [rolesData, setRolesData]       = useState({});
   const [activeRoleId, setActiveRoleId] = useState('admin');
+  const [activeTab, setActiveTab]       = useState('modulos'); // 'modulos' | 'areas'
   const [loading, setLoading]           = useState(true);
   const [saving, setSaving]             = useState(false);
+
+  // Snapshot de permisos tal como están en BD — para detectar diffs al guardar
+  const originalPermsRef = useRef({});
 
   const loadRoles = useCallback(async () => {
     setLoading(true);
     try {
       const res = await apiClient.get('/roles');
       const map = {};
+      const snapshot = {};
       res.data.forEach(r => {
         const meta = ROLE_DISPLAY[r.name] || { displayName: r.name, description: r.description || '' };
         map[r.name] = {
@@ -60,9 +138,10 @@ const RBAC = () => {
           description: meta.description,
           permissions: r.permissions || [],
         };
+        snapshot[r.name] = [...(r.permissions || [])];
       });
+      originalPermsRef.current = snapshot;
       setRolesData(map);
-      // Seleccionar el primer rol disponible si "admin" no existe
       if (!map['admin'] && Object.keys(map).length > 0) {
         setActiveRoleId(Object.keys(map)[0]);
       }
@@ -82,7 +161,18 @@ const RBAC = () => {
     let perms = [...role.permissions];
 
     if (permId === 'all') {
+      // Super admin: activa todo o limpia todo
       perms = perms.includes('all') ? [] : ['all'];
+    } else if (permId === '__all_areas__') {
+      // Botón "Acceso a Todas las Áreas": activa/desactiva todos los permisos físicos
+      // sin tocar permisos de módulo que no pertenecen a esta sección
+      const allActive = REAL_AREA_IDS.every(id => perms.includes(id));
+      if (allActive) {
+        perms = perms.filter(id => !REAL_AREA_IDS.includes(id));
+      } else {
+        const toAdd = REAL_AREA_IDS.filter(id => !perms.includes(id));
+        perms = [...perms, ...toAdd];
+      }
     } else {
       perms = perms.filter(p => p !== 'all');
       perms = perms.includes(permId)
@@ -100,13 +190,31 @@ const RBAC = () => {
     const role = rolesData[activeRoleId];
     if (!role) return;
 
+    const prevPerms = [...(originalPermsRef.current[activeRoleId] || [])];
+
     setSaving(true);
     try {
       const res = await apiClient.put(`/roles/${role.id_rol}`, { permissions: role.permissions });
       const savedPerms = res.data.permissions || role.permissions;
-      const permLabels = savedPerms.length
-        ? savedPerms.map(p => PERMISSIONS.find(x => x.id === p)?.label || p).join(', ')
-        : 'Ninguno';
+
+      // Registrar eventos de cambio de permisos
+      logPermissionChanges(user, activeRoleId, activeRole.name, prevPerms, savedPerms);
+      // Actualizar snapshot con los permisos ya guardados en BD
+      originalPermsRef.current = { ...originalPermsRef.current, [activeRoleId]: [...savedPerms] };
+
+      const moduleLabels = savedPerms
+        .map(p => MODULE_PERMISSIONS.find(x => x.id === p)?.label)
+        .filter(Boolean);
+      const areaLabels = savedPerms
+        .map(p => AREA_PERMISSIONS.find(x => x.id === p)?.label)
+        .filter(Boolean);
+
+      const moduleHtml = moduleLabels.length
+        ? `<li style="margin-bottom:2px"><strong>Módulos:</strong> ${moduleLabels.join(', ')}</li>`
+        : '';
+      const areaHtml = areaLabels.length
+        ? `<li><strong>Áreas físicas:</strong> ${areaLabels.join(', ')}</li>`
+        : '';
 
       Swal.fire({
         icon: 'success',
@@ -114,10 +222,12 @@ const RBAC = () => {
         html: `<p style="font-size:13px;color:#475569;margin-bottom:8px">
                  Rol: <strong>${role.name}</strong>
                </p>
-               <p style="font-size:12px;color:#64748b">
-                 Permisos activos: <strong>${permLabels}</strong>
-               </p>
-               <p style="font-size:11px;color:#94a3b8;margin-top:8px">
+               ${(moduleHtml || areaHtml)
+                 ? `<ul style="font-size:12px;color:#64748b;text-align:left;padding-left:16px;line-height:1.7">
+                      ${moduleHtml}${areaHtml}
+                    </ul>`
+                 : `<p style="font-size:12px;color:#94a3b8">Sin permisos asignados</p>`}
+               <p style="font-size:11px;color:#94a3b8;margin-top:10px">
                  Los cambios aplican en el próximo inicio de sesión del colaborador.
                </p>`,
         confirmButtonColor: '#0d2347',
@@ -150,7 +260,19 @@ const RBAC = () => {
   if (!activeRole) return null;
 
   const isSuperAdmin = activeRole.permissions.includes('all');
+  const activePerms  = activeRole.permissions;
 
+  // Conteos por sección (excluye el botón __all_areas__ ya que no es un permiso real)
+  const moduleCount = isSuperAdmin
+    ? MODULE_PERMISSIONS.length
+    : MODULE_PERMISSIONS.filter(p => activePerms.includes(p.id)).length;
+  const areaCount = isSuperAdmin
+    ? REAL_AREA_IDS.length
+    : REAL_AREA_IDS.filter(id => activePerms.includes(id)).length;
+
+  const currentList = activeTab === 'modulos' ? MODULE_PERMISSIONS : AREA_PERMISSIONS;
+
+  /* ── RENDER ──────────────────────────────────────────────────────────────── */
   return (
     <div className="space-y-6">
 
@@ -158,7 +280,7 @@ const RBAC = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 font-['Outfit']">Roles y Permisos</h2>
-          <p className="text-sm text-slate-500 mt-1">Configure los privilegios de cada perfil institucional y la visibilidad de módulos.</p>
+          <p className="text-sm text-slate-500 mt-1">Configure los privilegios de cada perfil institucional.</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={loadRoles} className="btn-icon" title="Recargar roles">
@@ -176,30 +298,34 @@ const RBAC = () => {
       </div>
 
       {/* Info banner */}
-      <div className="flex items-start gap-3 p-5 rounded-xl bg-[#84cc16]/10 border border-[#84cc16]/30 shadow-sm">
-        <MdInfoOutline size={22} className="text-[#65a30d] shrink-0 mt-0.5" />
+      <div className="flex items-start gap-3 p-4 rounded-xl bg-[#84cc16]/10 border border-[#84cc16]/30 shadow-sm">
+        <MdInfoOutline size={20} className="text-[#65a30d] shrink-0 mt-0.5" />
         <p className="text-sm text-slate-700 leading-relaxed font-medium">
-          <strong className="text-slate-900 font-bold">Cambios persistentes.</strong> Las modificaciones de permisos se guardan en la base de datos y se aplican en el siguiente inicio de sesión de cada empleado. Tenga especial cuidado al otorgar{' '}
-          <span className="text-red-600 font-bold">Acceso Total</span> o{' '}
-          <span className="text-[#65a30d] font-bold">Resolver Incidentes</span>.
+          <strong className="text-slate-900">Cambios persistentes.</strong>{' '}
+          Los permisos se guardan en la base de datos y se aplican en el próximo inicio de sesión del colaborador.
+          Los <strong>permisos de módulo</strong> controlan qué secciones del panel puede ver cada rol.
+          Los <strong>permisos de área</strong> controlan el acceso físico validado por el escáner QR.
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-        {/* ── SELECTOR DE ROL ──────────────────────── */}
+        {/* ── SELECTOR DE ROL ──────────────────────────────────────────────── */}
         <div className="lg:col-span-4 space-y-3">
           <p className="text-xs font-black text-slate-500 uppercase tracking-widest px-1">Perfiles Institucionales</p>
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             {Object.values(rolesData).map(role => {
               const active = activeRoleId === role.id;
+              const roleSuperAdmin = role.permissions.includes('all');
+              const modCount   = roleSuperAdmin ? MODULE_PERMISSIONS.length : MODULE_PERMISSIONS.filter(p => role.permissions.includes(p.id)).length;
+              const areaCount2 = roleSuperAdmin ? REAL_AREA_IDS.length     : REAL_AREA_IDS.filter(id => role.permissions.includes(id)).length;
               return (
                 <button
                   key={role.id}
                   onClick={() => setActiveRoleId(role.id)}
                   className={`w-full text-left p-4 rounded-xl border transition-all cursor-pointer ${
                     active
-                      ? 'bg-white border-l-4 border-l-[#84cc16] border-y-slate-200 border-r-slate-200 shadow-md transform translate-x-1'
+                      ? 'bg-white border-l-4 border-l-[#84cc16] border-y-slate-200 border-r-slate-200 shadow-md translate-x-1'
                       : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
                   }`}
                 >
@@ -214,77 +340,134 @@ const RBAC = () => {
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-1.5 leading-relaxed font-medium">{role.description}</p>
-                  <div className="flex items-center gap-1.5 mt-3">
-                    <MdLockOpen size={14} className="text-slate-400" />
-                    <span className="text-[11px] font-bold text-slate-500">
-                      {role.permissions.includes('all') ? 'Todos los privilegios' : `${role.permissions.length} privilegio(s)`}
-                    </span>
-                  </div>
+                  {roleSuperAdmin ? (
+                    <div className="flex items-center gap-1.5 mt-2.5">
+                      <MdShield size={13} className="text-[#84cc16]" />
+                      <span className="text-[11px] font-bold text-[#65a30d]">Todos los privilegios</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3 mt-2.5">
+                      <div className="flex items-center gap-1">
+                        <MdApps size={12} className="text-slate-400" />
+                        <span className="text-[10px] font-bold text-slate-500">{modCount} módulo{modCount !== 1 ? 's' : ''}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <MdDoorFront size={12} className="text-slate-400" />
+                        <span className="text-[10px] font-bold text-slate-500">{areaCount2} área{areaCount2 !== 1 ? 's' : ''}</span>
+                      </div>
+                    </div>
+                  )}
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* ── MATRIZ DE PERMISOS ───────────────────── */}
-        <div className="lg:col-span-8 p-6 rounded-2xl bg-white shadow-lg border border-slate-200">
+        {/* ── PANEL DE PERMISOS ─────────────────────────────────────────────── */}
+        <div className="lg:col-span-8 rounded-2xl bg-white shadow-lg border border-slate-200 overflow-hidden">
 
-          <div className="flex items-start justify-between pb-5 border-b border-slate-200 mb-5 gap-3">
-            <div>
-              <h3 className="text-lg font-black text-slate-800 font-['Outfit']">
-                Permisos: {activeRole.name}
-              </h3>
-              <p className="text-sm text-slate-500 mt-1 font-medium">Haga clic en un permiso para activar o revocar.</p>
+          {/* Cabecera del panel */}
+          <div className="px-6 pt-6 pb-0">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-800 font-['Outfit']">
+                  {activeRole.name}
+                </h3>
+                <p className="text-sm text-slate-500 mt-0.5 font-medium">Haga clic en un permiso para activar o revocar.</p>
+              </div>
+              <div className="flex items-center gap-2 text-xs px-3 py-1.5 bg-slate-100 rounded-lg border border-slate-200 font-mono text-slate-600 shrink-0 font-bold">
+                <MdShield size={15} className="text-[#84cc16]" />
+                {isSuperAdmin ? 'SUPER ADMIN' : `${moduleCount}M · ${areaCount}A`}
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-xs px-3 py-1.5 bg-slate-100 rounded-lg border border-slate-200 font-mono text-slate-600 shrink-0 font-bold">
-              <MdShield size={16} className="text-[#84cc16]" />
-              {isSuperAdmin ? 'SUPER ADMIN' : `${activeRole.permissions.length} activos`}
+
+            {/* Tabs: Módulos / Áreas */}
+            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-0">
+              <button
+                onClick={() => setActiveTab('modulos')}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-bold transition-all ${
+                  activeTab === 'modulos'
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <MdApps size={16} className={activeTab === 'modulos' ? 'text-[#84cc16]' : ''} />
+                Módulos del Sistema
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                  activeTab === 'modulos' ? 'bg-[#84cc16]/20 text-[#65a30d]' : 'bg-slate-200 text-slate-500'
+                }`}>{moduleCount}</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('areas')}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-bold transition-all ${
+                  activeTab === 'areas'
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <MdDoorFront size={16} className={activeTab === 'areas' ? 'text-[#84cc16]' : ''} />
+                Áreas de la Agencia
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                  activeTab === 'areas' ? 'bg-[#84cc16]/20 text-[#65a30d]' : 'bg-slate-200 text-slate-500'
+                }`}>{areaCount}</span>
+              </button>
             </div>
           </div>
 
-          <div className="space-y-3 max-h-[520px] overflow-y-auto pr-2">
-            {PERMISSIONS.map(({ id, label, category }) => {
-              const hasPerm = isSuperAdmin || activeRole.permissions.includes(id);
-              const catStyle = CATEGORY_COLORS[category] ?? 'text-slate-500 bg-slate-100 border-slate-200';
+          {/* Lista de permisos */}
+          <div className="p-5 space-y-2.5 max-h-[440px] overflow-y-auto">
+            {/* Hint contextual por tab */}
+            <p className="text-[11px] text-slate-400 font-medium pb-1">
+              {activeTab === 'modulos'
+                ? 'Estos permisos determinan qué módulos del panel lateral puede ver y acceder este rol.'
+                : 'Estos permisos controlan a qué áreas físicas puede ingresar el colaborador al pasar su QR.'}
+            </p>
 
+            {currentList.map(({ id, label, desc, category, categoryStyle, isSelectAll }) => {
+              const hasPerm = isSuperAdmin
+                || (isSelectAll ? REAL_AREA_IDS.every(rid => activePerms.includes(rid)) : activePerms.includes(id));
               return (
                 <div
-                  key={id}
+                  key={`${activeTab}-${id}`}
                   onClick={() => togglePermission(activeRoleId, id)}
-                  className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all select-none ${
+                  className={`flex items-start justify-between p-4 rounded-xl border-2 cursor-pointer transition-all select-none gap-3 ${
                     hasPerm
                       ? 'bg-[#84cc16]/5 border-[#84cc16]/40 hover:border-[#84cc16]'
                       : 'bg-slate-50 border-slate-200 hover:border-slate-300'
                   }`}
                 >
-                  <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                      hasPerm ? 'bg-[#84cc16]/20 text-[#65a30d]' : 'bg-slate-200 text-slate-500'
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                      hasPerm ? 'bg-[#84cc16]/20 text-[#65a30d]' : 'bg-slate-200 text-slate-400'
                     }`}>
-                      <MdSecurity size={20} />
+                      {activeTab === 'modulos' ? <MdApps size={18} /> : <MdDoorFront size={18} />}
                     </div>
-                    <div>
-                      <p className={`text-sm font-bold ${hasPerm ? 'text-slate-800' : 'text-slate-600'}`}>{label}</p>
-                      <span className={`inline-block mt-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${catStyle}`}>
+                    <div className="min-w-0">
+                      <p className={`text-sm font-bold leading-snug ${hasPerm ? 'text-slate-800' : 'text-slate-600'}`}>
+                        {label}
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed font-medium">{desc}</p>
+                      <span className={`inline-block mt-1.5 text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${categoryStyle}`}>
                         {category}
                       </span>
                     </div>
                   </div>
 
-                  <div className={`flex items-center gap-2 text-sm font-bold shrink-0 ${hasPerm ? 'text-[#84cc16]' : 'text-slate-400'}`}>
-                    {hasPerm ? <MdCheckCircle size={22} /> : <MdCancel size={22} />}
-                    <span className="text-xs uppercase tracking-wider hidden sm:inline">
-                      {hasPerm ? 'Permitido' : 'Denegado'}
-                    </span>
+                  <div className={`flex items-center gap-1.5 shrink-0 mt-1 ${hasPerm ? 'text-[#84cc16]' : 'text-slate-300'}`}>
+                    {hasPerm
+                      ? <MdCheckCircle size={22} />
+                      : <MdCancel size={22} />}
                   </div>
                 </div>
               );
             })}
           </div>
 
-          <div className="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 font-medium">
+          <div className="px-6 py-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 font-medium bg-slate-50/50">
             <span>Cooperativa Kullki Wasi Ltda.</span>
-            <span className="font-mono bg-slate-100 px-2 py-1 rounded">DB: {Object.keys(rolesData).length} roles cargados</span>
+            <span className="font-mono bg-white px-2 py-1 rounded border border-slate-200">
+              DB: {Object.keys(rolesData).length} roles cargados
+            </span>
           </div>
         </div>
 
