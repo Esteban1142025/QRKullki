@@ -203,6 +203,11 @@ const RestrictedAreas = () => {
     </div>
   );
 
+  // Derivar directamente de user.agency — reactivo al switcher sin estado extra
+  const displayAreas = agency
+    ? areas.filter(a => !a.agency || a.agency === agency)
+    : areas;
+
   /* ── Render principal ── */
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -222,7 +227,7 @@ const RestrictedAreas = () => {
 
       {/* Grid de áreas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {areas.map(area => (
+        {displayAreas.map(area => (
           <div key={area.id} className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-lg transition-all flex flex-col h-full relative overflow-hidden group">
             <div className={`absolute top-0 right-0 w-36 h-36 rounded-full blur-3xl pointer-events-none ${area.riskLevel === 'Crítico' ? 'bg-red-500/10' : area.riskLevel === 'Alto' ? 'bg-orange-500/10' : 'bg-[#84cc16]/10'}`} />
             <div className="relative z-10 flex-1 flex flex-col">

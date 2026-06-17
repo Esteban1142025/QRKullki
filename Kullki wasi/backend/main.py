@@ -561,6 +561,9 @@ def listar_areas(db: Session = Depends(get_db)):
         else:
             allowed = ["all"]
 
+        agencia_codigo = None
+        if a.agencia:
+            agencia_codigo = a.agencia.codigo or a.agencia.nombre
         result.append({
             "id": f"AR-{a.id_area}",
             "id_area": a.id_area,
@@ -569,6 +572,7 @@ def listar_areas(db: Session = Depends(get_db)):
             "status": "Protegido" if a.estado else "Inactivo",
             "schedule": a.horario or "08:00 - 18:00",
             "allowedRoles": allowed,
+            "agency": agencia_codigo,
         })
     return result
 
@@ -750,6 +754,11 @@ def listar_alertas(db: Session = Depends(get_db)):
     for a in alertas:
         motivo = a.bitacora.motivo if a.bitacora else "Sin detalles"
         area_nombre = a.bitacora.area.nombre if (a.bitacora and a.bitacora.area) else "Sistema"
+        # Resolver la agencia real desde la cadena alerta → bitácora → área → agencia
+        ag_obj = None
+        if a.bitacora and a.bitacora.area and a.bitacora.area.agencia:
+            ag_obj = a.bitacora.area.agencia
+        agencia_codigo = (ag_obj.codigo or ag_obj.nombre) if ag_obj else None
         severity = "Crítica" if "Denegado" in a.tipo_alerta or "Intrusión" in a.tipo_alerta else "Alta"
         result.append({
             "id": f"ALT-{a.id_alerta}",
@@ -758,7 +767,7 @@ def listar_alertas(db: Session = Depends(get_db)):
             "severity": severity,
             "status": a.estado,
             "area": area_nombre,
-            "agency": "Sistema",
+            "agency": agencia_codigo,
             "date": utc_iso(a.fecha_generacion),
             "details": motivo,
             "isResolved": a.estado == "RESUELTA",

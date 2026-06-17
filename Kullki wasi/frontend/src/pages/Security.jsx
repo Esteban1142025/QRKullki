@@ -61,13 +61,19 @@ const Security = () => {
 
   const [statusFilter, setStatusFilter] = useState('TODAS');
 
-  const unresolvedAlerts = alerts.filter(a => !a.isResolved && a.status !== 'RESUELTA');
-  const resolvedAlerts   = alerts.filter(a => a.isResolved  || a.status === 'RESUELTA');
+  // Filtrar por agencia activa del contexto global (reactivo al switcher)
+  const effectiveAgency = user?.agency || null;
+  const agencyAlerts = effectiveAgency
+    ? alerts.filter(a => !a.agency || a.agency === effectiveAgency)
+    : alerts;
+
+  const unresolvedAlerts = agencyAlerts.filter(a => !a.isResolved && a.status !== 'RESUELTA');
+  const resolvedAlerts   = agencyAlerts.filter(a => a.isResolved  || a.status === 'RESUELTA');
 
   const counts = {
-    TODAS:            alerts.length,
-    ABIERTA:          alerts.filter(a => a.status === 'ABIERTA').length,
-    EN_INVESTIGACION: alerts.filter(a => a.status === 'EN_INVESTIGACION').length,
+    TODAS:            agencyAlerts.length,
+    ABIERTA:          agencyAlerts.filter(a => a.status === 'ABIERTA').length,
+    EN_INVESTIGACION: agencyAlerts.filter(a => a.status === 'EN_INVESTIGACION').length,
     RESUELTA:         resolvedAlerts.length,
   };
 

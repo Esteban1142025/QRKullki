@@ -73,6 +73,7 @@ class AreaRestringida(Base):
     horario = Column(String(50), default='08:00 - 18:00')
 
     permiso_requerido = relationship("Permiso")
+    agencia           = relationship("Agencia")
 
 class EmpleadoArea(Base):
     __tablename__ = "empleados_areas"
