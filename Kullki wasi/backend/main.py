@@ -787,6 +787,14 @@ def crear_area(data: AreaCreate, db: Session = Depends(get_db)):
     db.add(a)
     db.commit()
     db.refresh(a)
+    # Crear automáticamente un dispositivo lector para esta área
+    disp = models.DispositivoEscaneo(
+        identificador_equipo=f"Lector {a.nombre}",
+        id_area=a.id_area,
+        estado=True,
+    )
+    db.add(disp)
+    db.commit()
     return {"id": f"AR-{a.id_area}", "name": a.nombre, "riskLevel": a.nivel_riesgo, "schedule": a.horario}
 
 @app.put("/api/v1/areas/{id_area}")
@@ -801,6 +809,16 @@ def actualizar_area(id_area: int, data: AreaUpdate, db: Session = Depends(get_db
     db.commit()
     db.refresh(a)
     return {"id": f"AR-{a.id_area}", "name": a.nombre, "riskLevel": a.nivel_riesgo, "schedule": a.horario}
+
+@app.delete("/api/v1/areas/{id_area}", status_code=204)
+def eliminar_area(id_area: int, db: Session = Depends(get_db)):
+    a = db.query(models.AreaRestringida).filter(models.AreaRestringida.id_area == id_area).first()
+    if not a:
+        raise HTTPException(status_code=404, detail="Área no encontrada")
+    # Eliminar dispositivos vinculados al área antes de eliminar el área
+    db.query(models.DispositivoEscaneo).filter(models.DispositivoEscaneo.id_area == id_area).delete()
+    db.delete(a)
+    db.commit()
 
 # --- Roles ---
 
@@ -1012,7 +1030,7 @@ def listar_dispositivos(db: Session = Depends(get_db)):
             "area": area_nombre,
             "agency": agency,
             "ip": d.ip_address or f"192.168.10.{20 + d.id_dispositivo}",
-            "status": "Online" if d.estado else "Offline",
+            "status": "Online",
             "lastPulse": utc_iso(d.ultima_sincronizacion),
             "mac": d.mac_address or "",
         })

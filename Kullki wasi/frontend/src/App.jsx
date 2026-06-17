@@ -14,6 +14,7 @@ import Employees from './pages/Employees';
 import RBAC from './pages/RBAC';
 import QRScanner from './pages/QRScanner';
 import RestrictedAreas from './pages/RestrictedAreas';
+import AreaForm from './pages/AreaForm';
 import Logs from './pages/Logs';
 import Audit from './pages/Audit';
 import Security from './pages/Security';
@@ -66,6 +67,18 @@ function App() {
             <Route path="restricted-areas" element={
               <ProtectedRoute allowedRoles={['admin', 'riesgos', 'seguridad_fisica']} allowedPermission="modulo_areas_criticas">
                 <RestrictedAreas />
+              </ProtectedRoute>
+            } />
+
+            <Route path="restricted-areas/new" element={
+              <ProtectedRoute allowedRoles={['admin', 'seguridad_fisica', 'tecnico_ti']} allowedPermission="modulo_areas_criticas">
+                <AreaForm />
+              </ProtectedRoute>
+            } />
+
+            <Route path="restricted-areas/edit/:areaId" element={
+              <ProtectedRoute allowedRoles={['admin', 'seguridad_fisica', 'tecnico_ti']} allowedPermission="modulo_areas_criticas">
+                <AreaForm />
               </ProtectedRoute>
             } />
 
