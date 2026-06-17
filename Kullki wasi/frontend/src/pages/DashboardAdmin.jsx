@@ -300,9 +300,9 @@ const DashboardAdmin = () => {
       </div>
 
       {/* RECENT LOGS + SECURITY CHECKLIST */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6">
 
-        <div className="card-corporate p-8 lg:col-span-2 flex flex-col">
+        <div className="card-corporate p-8 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Trazabilidad Reciente</h3>
@@ -349,34 +349,6 @@ const DashboardAdmin = () => {
                 <p className="text-center">Sin registros de acceso aún.<br /><span className="text-xs">Los escaneos QR aparecerán aquí.</span></p>
               </div>
             )}
-          </div>
-        </div>
-
-        <div className="card-corporate p-8 flex flex-col justify-between">
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Cumplimiento SEPS</h3>
-              <p className="text-[10px] text-slate-500 mt-0.5">Estado de políticas institucionales activas</p>
-            </div>
-            {[
-              { icon: MdSecurity,    label: 'Control RBAC Activo',        desc: 'Módulos dinámicos por rol en tiempo real.' },
-              { icon: MdSensors,     label: 'Dispositivos QR Cifrados',   desc: 'Terminales con latidos y firma hash.' },
-              { icon: MdReceiptLong, label: 'Bitácora Inalterable',       desc: 'Cada validación genera trazabilidad auditada.' },
-            ].map(({ icon: Icon, label, desc }) => (
-              <div key={label} className="flex items-start gap-3 p-3 rounded-xl bg-white border border-slate-200 shadow-sm">
-                <div className="w-8 h-8 rounded-lg bg-[#8DC63F]/15 flex items-center justify-center text-[#79ac34] shrink-0">
-                  <Icon size={16} />
-                </div>
-                <div>
-                  <p className="text-[11px] font-bold text-slate-700">{label}</p>
-                  <p className="text-[10px] font-medium text-slate-500 mt-0.5 leading-relaxed">{desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="pt-4 mt-2 border-t border-slate-200 text-center">
-            <p className="text-[10px] text-slate-500 font-bold">Cooperativa Kullki Wasi Ltda.</p>
-            <p className="text-[9px] text-[#79ac34] font-black uppercase tracking-wider mt-0.5">Segmento Financiero 1 — Ecuador</p>
           </div>
         </div>
       </div>

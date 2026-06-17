@@ -257,6 +257,16 @@ const Employees = () => {
       return;
     }
 
+    if (form.dni.length !== 10) {
+      fireSwal({ icon: 'error', title: 'Cédula inválida', text: 'La cédula de identidad debe tener exactamente 10 dígitos numéricos.' });
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      fireSwal({ icon: 'error', title: 'Correo inválido', text: 'Ingrese una dirección de correo válida.' });
+      return;
+    }
+
     const parts = form.name.trim().split(' ');
     const nombres = parts[0];
     const apellidos = parts.slice(1).join(' ') || parts[0];
@@ -297,7 +307,14 @@ const Employees = () => {
     }
   };
 
-  const field = (key, val) => setForm(f => ({ ...f, [key]: val }));
+  const field = (key, val) => {
+    if (key === 'dni') {
+      val = val.replace(/\D/g, '').slice(0, 10);
+    } else if (key === 'phone') {
+      val = val.replace(/\D/g, '').slice(0, 10);
+    }
+    setForm(f => ({ ...f, [key]: val }));
+  };
 
   if (loading) {
     return (

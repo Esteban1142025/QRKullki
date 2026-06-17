@@ -6,7 +6,10 @@ DROP TABLE IF EXISTS agencias CASCADE;
 CREATE TABLE agencias (
   id_agencia BIGSERIAL PRIMARY KEY,
   nombre VARCHAR(100) NOT NULL,
+  codigo VARCHAR(10),
   direccion TEXT,
+  telefono VARCHAR(20),
+  tipo VARCHAR(30) DEFAULT 'Sucursal',
   estado BOOLEAN DEFAULT true
 );
 
@@ -48,6 +51,7 @@ CREATE TABLE empleados (
   email VARCHAR(150) UNIQUE,
   password_hash VARCHAR(255),
   estado_laboral VARCHAR(20) DEFAULT 'ACTIVO',
+  departamento VARCHAR(100),
   creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (id_agencia_base) REFERENCES agencias(id_agencia) ON DELETE SET NULL
 );
@@ -71,6 +75,7 @@ CREATE TABLE areas_restringidas (
   nivel_riesgo VARCHAR(50) NOT NULL,
   id_permiso_requerido BIGINT,
   estado BOOLEAN DEFAULT true,
+  horario VARCHAR(50) DEFAULT '08:00 - 18:00',
   FOREIGN KEY (id_agencia) REFERENCES agencias(id_agencia) ON DELETE CASCADE,
   FOREIGN KEY (id_permiso_requerido) REFERENCES permisos(id_permiso) ON DELETE SET NULL
 );
@@ -95,6 +100,7 @@ CREATE TABLE dispositivos_escaneo (
   id_area BIGINT,
   identificador_equipo VARCHAR(100) NOT NULL UNIQUE,
   mac_address VARCHAR(50),
+  ip_address VARCHAR(50),
   estado BOOLEAN DEFAULT true,
   ultima_sincronizacion TIMESTAMP,
   FOREIGN KEY (id_area) REFERENCES areas_restringidas(id_area) ON DELETE SET NULL

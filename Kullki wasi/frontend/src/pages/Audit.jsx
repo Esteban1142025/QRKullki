@@ -58,6 +58,9 @@ const Audit = () => {
   const [auditReport, setAuditReport]   = useState(null);
   const [runningAudit, setRunningAudit] = useState(false);
   const [recentEvents, setRecentEvents] = useState([]);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -357,11 +360,8 @@ ul{padding-left:16px;margin-top:4px}li{font-size:11px;margin-bottom:5px;line-hei
           <button onClick={loadDashboard} className="btn-icon" title="Actualizar datos">
             <MdRefresh size={18} />
           </button>
-          <button onClick={handleExportPDF} disabled={!dashData} className="btn-secondary whitespace-nowrap disabled:opacity-40">
-            <MdPictureAsPdf size={16} className="text-red-500" /> PDF
-          </button>
-          <button onClick={handleExportExcel} disabled={!dashData} className="btn-secondary whitespace-nowrap disabled:opacity-40">
-            <MdDescription size={16} className="text-green-600" /> EXCEL
+          <button onClick={() => setShowExportModal(true)} disabled={!dashData} className="btn-secondary whitespace-nowrap disabled:opacity-40">
+            <MdDescription size={16} className="text-slate-600" /> IMPRIMIR REPORTES
           </button>
           <button onClick={runSystemAudit} disabled={runningAudit} className="btn-primary whitespace-nowrap disabled:opacity-50">
             {runningAudit
@@ -678,6 +678,51 @@ ul{padding-left:16px;margin-top:4px}li{font-size:11px;margin-bottom:5px;line-hei
 
               <div className="flex items-center justify-end pt-4 border-t border-slate-100">
                 <button onClick={() => setShowReport(false)} className="btn-secondary">Cerrar Diagnóstico</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showExportModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xl">
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-slate-800">
+                <MdDescription className="text-[#8DC63F]" size={20} />
+                <span className="text-xs font-black uppercase tracking-wider font-['Outfit']">Generar Reportes</span>
+              </div>
+              <button onClick={() => setShowExportModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <MdClose size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-slate-600">Seleccione un rango de fechas para generar el reporte:</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Fecha Inicio</label>
+                  <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:border-[#8DC63F] outline-none" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Fecha Fin (Opcional)</label>
+                  <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:border-[#8DC63F] outline-none" />
+                </div>
+              </div>
+              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100 mt-2">
+                <button 
+                  onClick={() => { handleExportPDF(); setShowExportModal(false); }} 
+                  disabled={!startDate}
+                  className="btn-secondary text-red-500 disabled:opacity-40"
+                >
+                  <MdPictureAsPdf size={16} /> Exportar PDF
+                </button>
+                <button 
+                  onClick={() => { handleExportExcel(); setShowExportModal(false); }} 
+                  disabled={!startDate}
+                  className="btn-secondary text-green-600 disabled:opacity-40"
+                >
+                  <MdDescription size={16} /> Exportar Excel
+                </button>
               </div>
             </div>
           </div>
