@@ -763,6 +763,7 @@ def listar_areas(db: Session = Depends(get_db)):
         agencia_codigo = None
         if a.agencia:
             agencia_codigo = a.agencia.codigo or a.agencia.nombre
+        perm_obj = db.query(models.Permiso).filter(models.Permiso.id_permiso == a.id_permiso_requerido).first() if a.id_permiso_requerido else None
         result.append({
             "id": f"AR-{a.id_area}",
             "id_area": a.id_area,
@@ -772,6 +773,7 @@ def listar_areas(db: Session = Depends(get_db)):
             "schedule": a.horario or "08:00 - 18:00",
             "allowedRoles": allowed,
             "agency": agencia_codigo,
+            "permiso_codigo": perm_obj.codigo_permiso if perm_obj else None,
         })
     return result
 
@@ -787,6 +789,16 @@ def crear_area(data: AreaCreate, db: Session = Depends(get_db)):
     db.add(a)
     db.commit()
     db.refresh(a)
+    # Crear permiso específico para este área
+    perm = models.Permiso(
+        codigo_permiso=f"area_{a.id_area}",
+        descripcion=f"Acceso al área: {a.nombre}"
+    )
+    db.add(perm)
+    db.flush()
+    a.id_permiso_requerido = perm.id_permiso
+    db.commit()
+    db.refresh(a)
     # Crear automáticamente un dispositivo lector para esta área
     disp = models.DispositivoEscaneo(
         identificador_equipo=f"Lector {a.nombre}",
@@ -795,7 +807,7 @@ def crear_area(data: AreaCreate, db: Session = Depends(get_db)):
     )
     db.add(disp)
     db.commit()
-    return {"id": f"AR-{a.id_area}", "name": a.nombre, "riskLevel": a.nivel_riesgo, "schedule": a.horario}
+    return {"id": f"AR-{a.id_area}", "name": a.nombre, "riskLevel": a.nivel_riesgo, "schedule": a.horario, "permiso_codigo": f"area_{a.id_area}"}
 
 @app.put("/api/v1/areas/{id_area}")
 def actualizar_area(id_area: int, data: AreaUpdate, db: Session = Depends(get_db)):
@@ -815,6 +827,16 @@ def eliminar_area(id_area: int, db: Session = Depends(get_db)):
     a = db.query(models.AreaRestringida).filter(models.AreaRestringida.id_area == id_area).first()
     if not a:
         raise HTTPException(status_code=404, detail="Área no encontrada")
+    # Eliminar permiso específico del área (area_X) y removerlo de roles
+    if a.id_permiso_requerido:
+        perm = db.query(models.Permiso).filter(models.Permiso.id_permiso == a.id_permiso_requerido).first()
+        if perm and perm.codigo_permiso.startswith('area_'):
+            for rol in db.query(models.Rol).all():
+                if perm in rol.permisos:
+                    rol.permisos.remove(perm)
+            db.flush()
+            db.delete(perm)
+            db.flush()
     # Eliminar dispositivos vinculados al área antes de eliminar el área
     db.query(models.DispositivoEscaneo).filter(models.DispositivoEscaneo.id_area == id_area).delete()
     db.delete(a)

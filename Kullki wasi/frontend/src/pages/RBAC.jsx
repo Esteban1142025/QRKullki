@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../services/api/apiClient';
 import Swal from 'sweetalert2';
@@ -20,8 +20,7 @@ const ROLE_DISPLAY = {
   empleado:        { displayName: 'Empleado',                 description: 'Consulta de permisos propios y descarga de credencial QR' },
 };
 
-// ── Sección 1: Permisos de módulos del sistema ────────────────────────────────
-// Controlan qué módulos del panel lateral puede ver y acceder cada rol
+// Permisos de módulos del sistema (estáticos)
 const MODULE_PERMISSIONS = [
   {
     id: 'all',
@@ -67,69 +66,84 @@ const MODULE_PERMISSIONS = [
   },
 ];
 
-// ── IDs reales de acceso a áreas físicas ─────────────────────────────────────
-const REAL_AREA_IDS = ['acceso_boveda', 'acceso_cajas', 'acceso_servidores', 'acceso_archivo', 'acceso_total'];
+// Colores por agencia
+const AGENCY_STYLES = {
+  MAT: 'text-blue-700 bg-blue-100 border-blue-200',
+  PEL: 'text-emerald-700 bg-emerald-100 border-emerald-200',
+  PIL: 'text-violet-700 bg-violet-100 border-violet-200',
+  SAL: 'text-orange-700 bg-orange-100 border-orange-200',
+  BAN: 'text-red-700 bg-red-100 border-red-200',
+};
 
-// ── Sección 2: Permisos de acceso físico a áreas ──────────────────────────────
-// Controlan a qué áreas físicas de la agencia puede ingresar el colaborador via QR
-// '__all_areas__' es un ID de UI solamente — activa/desactiva todos los REAL_AREA_IDS a la vez
-const AREA_PERMISSIONS = [
-  {
-    id: '__all_areas__',
-    isSelectAll: true,
-    label: 'Acceso a Todas las Áreas',
-    desc: 'Ingreso irrestricto a cualquier área física de la agencia. Activa o desactiva todos los accesos de esta sección a la vez.',
-    category: 'Máximo Nivel',
-    categoryStyle: 'text-orange-700 bg-orange-100 border-orange-200',
-  },
-  {
-    id: 'acceso_boveda',
-    label: 'Bóveda Principal',
-    desc: 'Área blindada de resguardo de valores, efectivo y documentos de alta seguridad.',
-    category: 'Alta Seguridad',
-    categoryStyle: 'text-red-700 bg-red-100 border-red-200',
-  },
-  {
-    id: 'acceso_cajas',
-    label: 'Área de Cajas',
-    desc: 'Ventanillas de atención al cliente, operaciones financieras y transacciones en efectivo.',
-    category: 'Operaciones',
-    categoryStyle: 'text-blue-700 bg-blue-100 border-blue-200',
-  },
-  {
-    id: 'acceso_servidores',
-    label: 'Cuarto de Servidores TI',
-    desc: 'Infraestructura tecnológica, equipos de red, servidores y comunicaciones.',
-    category: 'Tecnología',
-    categoryStyle: 'text-cyan-700 bg-cyan-100 border-cyan-200',
-  },
-  {
-    id: 'acceso_archivo',
-    label: 'Archivo e Histórico',
-    desc: 'Sala de documentos institucionales, expedientes físicos y registros históricos.',
-    category: 'Administración',
-    categoryStyle: 'text-purple-700 bg-purple-100 border-purple-200',
-  },
-];
+const RISK_LABELS = {
+  Crítico: { style: 'text-red-700 bg-red-100 border-red-200',    dot: 'bg-red-500' },
+  Alto:    { style: 'text-orange-700 bg-orange-100 border-orange-200', dot: 'bg-orange-500' },
+  Medio:   { style: 'text-amber-700 bg-amber-100 border-amber-200',   dot: 'bg-amber-400' },
+  Bajo:    { style: 'text-emerald-700 bg-emerald-100 border-emerald-200', dot: 'bg-emerald-500' },
+};
 
 const RBAC = () => {
   const { user } = useAuth();
   const [rolesData, setRolesData]       = useState({});
+  const [areas, setAreas]               = useState([]);
   const [activeRoleId, setActiveRoleId] = useState('admin');
-  const [activeTab, setActiveTab]       = useState('modulos'); // 'modulos' | 'areas'
+  const [activeTab, setActiveTab]       = useState('modulos');
   const [loading, setLoading]           = useState(true);
   const [saving, setSaving]             = useState(false);
 
-  // Snapshot de permisos tal como están en BD — para detectar diffs al guardar
   const originalPermsRef = useRef({});
+
+  // Filtrar áreas por la agencia del usuario activo
+  const agencyAreas = useMemo(
+    () => areas.filter(a => a.agency === user?.agency && a.permiso_codigo),
+    [areas, user?.agency]
+  );
+
+  // Construir la lista dinámica de permisos de área desde las áreas cargadas
+  const dynamicAreaPermissions = useMemo(() => {
+    const items = agencyAreas
+      .map(a => ({
+        id:            a.permiso_codigo,
+        label:         a.name,
+        desc:          `Nivel de riesgo: ${a.riskLevel || 'Medio'} · Horario: ${a.schedule || '08:00 - 18:00'}`,
+        category:      a.agency || 'Cooperativa',
+        categoryStyle: AGENCY_STYLES[a.agency] || 'text-slate-700 bg-slate-100 border-slate-200',
+        riskLevel:     a.riskLevel,
+        agencia:       a.agency,
+      }));
+
+    return [
+      {
+        id: '__all_areas__',
+        isSelectAll: true,
+        label: 'Acceso a Todas las Áreas',
+        desc: 'Ingreso irrestricto a cualquier área física de la cooperativa. Activa o desactiva todos los accesos de esta sección a la vez.',
+        category: 'Máximo Nivel',
+        categoryStyle: 'text-orange-700 bg-orange-100 border-orange-200',
+      },
+      ...items,
+    ];
+  }, [areas]);
+
+  // IDs reales de permisos de área para la agencia activa (excluye __all_areas__)
+  const dynamicRealAreaIds = useMemo(
+    () => agencyAreas.map(a => a.permiso_codigo),
+    [agencyAreas]
+  );
 
   const loadRoles = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get('/roles');
+      const [rolesRes, areasRes] = await Promise.all([
+        apiClient.get('/roles'),
+        apiClient.get('/areas'),
+      ]);
+
+      setAreas(areasRes.data);
+
       const map = {};
       const snapshot = {};
-      res.data.forEach(r => {
+      rolesRes.data.forEach(r => {
         const meta = ROLE_DISPLAY[r.name] || { displayName: r.name, description: r.description || '' };
         map[r.name] = {
           id:          r.name,
@@ -161,17 +175,15 @@ const RBAC = () => {
     let perms = [...role.permissions];
 
     if (permId === 'all') {
-      // Super admin: activa todo o limpia todo
       perms = perms.includes('all') ? [] : ['all'];
     } else if (permId === '__all_areas__') {
-      // Botón "Acceso a Todas las Áreas": activa/desactiva todos los permisos físicos
-      // sin tocar permisos de módulo que no pertenecen a esta sección
-      const allActive = REAL_AREA_IDS.every(id => perms.includes(id));
+      // Toggle acceso_total + all specific area codes
+      const allActive = perms.includes('acceso_total') || dynamicRealAreaIds.every(id => perms.includes(id));
       if (allActive) {
-        perms = perms.filter(id => !REAL_AREA_IDS.includes(id));
+        perms = perms.filter(id => id !== 'acceso_total' && !dynamicRealAreaIds.includes(id));
       } else {
-        const toAdd = REAL_AREA_IDS.filter(id => !perms.includes(id));
-        perms = [...perms, ...toAdd];
+        const toAdd = dynamicRealAreaIds.filter(id => !perms.includes(id));
+        perms = [...perms.filter(id => id !== 'acceso_total'), 'acceso_total', ...toAdd];
       }
     } else {
       perms = perms.filter(p => p !== 'all');
@@ -197,16 +209,14 @@ const RBAC = () => {
       const res = await apiClient.put(`/roles/${role.id_rol}`, { permissions: role.permissions });
       const savedPerms = res.data.permissions || role.permissions;
 
-      // Registrar eventos de cambio de permisos
       logPermissionChanges(user, activeRoleId, activeRole.name, prevPerms, savedPerms);
-      // Actualizar snapshot con los permisos ya guardados en BD
       originalPermsRef.current = { ...originalPermsRef.current, [activeRoleId]: [...savedPerms] };
 
       const moduleLabels = savedPerms
         .map(p => MODULE_PERMISSIONS.find(x => x.id === p)?.label)
         .filter(Boolean);
       const areaLabels = savedPerms
-        .map(p => AREA_PERMISSIONS.find(x => x.id === p)?.label)
+        .map(p => dynamicAreaPermissions.find(x => x.id === p)?.label)
         .filter(Boolean);
 
       const moduleHtml = moduleLabels.length
@@ -259,20 +269,20 @@ const RBAC = () => {
   const activeRole = rolesData[activeRoleId];
   if (!activeRole) return null;
 
-  const isSuperAdmin = activeRole.permissions.includes('all');
-  const activePerms  = activeRole.permissions;
+  const isSuperAdmin  = activeRole.permissions.includes('all');
+  const hasAllAreas   = activeRole.permissions.includes('acceso_total');
+  const activePerms   = activeRole.permissions;
 
-  // Conteos por sección (excluye el botón __all_areas__ ya que no es un permiso real)
   const moduleCount = isSuperAdmin
     ? MODULE_PERMISSIONS.length
     : MODULE_PERMISSIONS.filter(p => activePerms.includes(p.id)).length;
-  const areaCount = isSuperAdmin
-    ? REAL_AREA_IDS.length
-    : REAL_AREA_IDS.filter(id => activePerms.includes(id)).length;
 
-  const currentList = activeTab === 'modulos' ? MODULE_PERMISSIONS : AREA_PERMISSIONS;
+  const areaCount = isSuperAdmin || hasAllAreas
+    ? dynamicRealAreaIds.length
+    : dynamicRealAreaIds.filter(id => activePerms.includes(id)).length;
 
-  /* ── RENDER ──────────────────────────────────────────────────────────────── */
+  const currentList = activeTab === 'modulos' ? MODULE_PERMISSIONS : dynamicAreaPermissions;
+
   return (
     <div className="space-y-6">
 
@@ -292,7 +302,7 @@ const RBAC = () => {
             className="flex items-center gap-2 px-5 py-3 bg-slate-800 hover:bg-slate-900 disabled:opacity-60 rounded-xl text-sm font-bold text-white tracking-wider transition-all cursor-pointer shadow-lg shrink-0"
           >
             <MdSave size={18} className="text-[#84cc16]" />
-            {saving ? 'GUARDANDO...' : 'COMPILAR POLÍTICAS RBAC'}
+            {saving ? 'GUARDANDO...' : 'Guardar Cambios'}
           </button>
         </div>
       </div>
@@ -315,10 +325,13 @@ const RBAC = () => {
           <p className="text-xs font-black text-slate-500 uppercase tracking-widest px-1">Perfiles Institucionales</p>
           <div className="space-y-2">
             {Object.values(rolesData).map(role => {
-              const active = activeRoleId === role.id;
+              const active        = activeRoleId === role.id;
               const roleSuperAdmin = role.permissions.includes('all');
-              const modCount   = roleSuperAdmin ? MODULE_PERMISSIONS.length : MODULE_PERMISSIONS.filter(p => role.permissions.includes(p.id)).length;
-              const areaCount2 = roleSuperAdmin ? REAL_AREA_IDS.length     : REAL_AREA_IDS.filter(id => role.permissions.includes(id)).length;
+              const roleAllAreas  = role.permissions.includes('acceso_total');
+              const modCount  = roleSuperAdmin ? MODULE_PERMISSIONS.length : MODULE_PERMISSIONS.filter(p => role.permissions.includes(p.id)).length;
+              const aCount    = roleSuperAdmin || roleAllAreas
+                ? dynamicRealAreaIds.length
+                : dynamicRealAreaIds.filter(id => role.permissions.includes(id)).length;
               return (
                 <button
                   key={role.id}
@@ -353,7 +366,7 @@ const RBAC = () => {
                       </div>
                       <div className="flex items-center gap-1">
                         <MdDoorFront size={12} className="text-slate-400" />
-                        <span className="text-[10px] font-bold text-slate-500">{areaCount2} área{areaCount2 !== 1 ? 's' : ''}</span>
+                        <span className="text-[10px] font-bold text-slate-500">{aCount} área{aCount !== 1 ? 's' : ''}</span>
                       </div>
                     </div>
                   )}
@@ -415,17 +428,20 @@ const RBAC = () => {
           </div>
 
           {/* Lista de permisos */}
-          <div className="p-5 space-y-2.5 max-h-[440px] overflow-y-auto">
-            {/* Hint contextual por tab */}
+          <div className="p-5 space-y-2.5 max-h-[520px] overflow-y-auto">
             <p className="text-[11px] text-slate-400 font-medium pb-1">
               {activeTab === 'modulos'
                 ? 'Estos permisos determinan qué módulos del panel lateral puede ver y acceder este rol.'
                 : 'Estos permisos controlan a qué áreas físicas puede ingresar el colaborador al pasar su QR.'}
             </p>
 
-            {currentList.map(({ id, label, desc, category, categoryStyle, isSelectAll }) => {
+            {currentList.map(({ id, label, desc, category, categoryStyle, isSelectAll, riskLevel, agencia }) => {
+              const allAreasActive = hasAllAreas || dynamicRealAreaIds.every(rid => activePerms.includes(rid));
               const hasPerm = isSuperAdmin
-                || (isSelectAll ? REAL_AREA_IDS.every(rid => activePerms.includes(rid)) : activePerms.includes(id));
+                || (isSelectAll
+                  ? allAreasActive
+                  : (hasAllAreas || activePerms.includes(id)));
+              const risk = RISK_LABELS[riskLevel];
               return (
                 <div
                   key={`${activeTab}-${id}`}
@@ -443,13 +459,28 @@ const RBAC = () => {
                       {activeTab === 'modulos' ? <MdApps size={18} /> : <MdDoorFront size={18} />}
                     </div>
                     <div className="min-w-0">
-                      <p className={`text-sm font-bold leading-snug ${hasPerm ? 'text-slate-800' : 'text-slate-600'}`}>
-                        {label}
-                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className={`text-sm font-bold leading-snug ${hasPerm ? 'text-slate-800' : 'text-slate-600'}`}>
+                          {label}
+                        </p>
+                        {agencia && (
+                          <span className={`text-[9px] font-mono font-black px-1.5 py-0.5 rounded border ${AGENCY_STYLES[agencia] || 'text-slate-600 bg-slate-100 border-slate-200'}`}>
+                            {agencia}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed font-medium">{desc}</p>
-                      <span className={`inline-block mt-1.5 text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${categoryStyle}`}>
-                        {category}
-                      </span>
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        <span className={`inline-block text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${categoryStyle}`}>
+                          {category}
+                        </span>
+                        {risk && (
+                          <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${risk.style}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${risk.dot}`} />
+                            {riskLevel}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -461,12 +492,18 @@ const RBAC = () => {
                 </div>
               );
             })}
+
+            {activeTab === 'areas' && dynamicAreaPermissions.length <= 1 && (
+              <p className="text-center text-slate-400 text-sm py-6">
+                No hay áreas críticas registradas. Crea áreas en el módulo Áreas Críticas.
+              </p>
+            )}
           </div>
 
           <div className="px-6 py-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 font-medium bg-slate-50/50">
             <span>Cooperativa Kullki Wasi Ltda.</span>
             <span className="font-mono bg-white px-2 py-1 rounded border border-slate-200">
-              DB: {Object.keys(rolesData).length} roles cargados
+              DB: {Object.keys(rolesData).length} roles · {agencyAreas.length} áreas ({user?.agency})
             </span>
           </div>
         </div>

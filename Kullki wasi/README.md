@@ -90,11 +90,32 @@ Requiere PostgreSQL disponible en el puerto 5433. Ajustar la cadena de conexion 
 
 ## Usuarios del Sistema
 
-Las siguientes cuentas estan registradas en la base de datos. Todas las contrasenas son las configuradas durante el proceso de seed inicial.
+### Administrador General (Matriz Ambato)
+
+| Rol               | Cedula       | Contrasena    | Agencia        | Modulos accesibles                                      |
+|-------------------|--------------|---------------|----------------|---------------------------------------------------------|
+| Administrador     | 0987654321   | admin123      | Matriz Ambato  | Todos los modulos y configuracion del sistema           |
+
+### Administradores por Agencia
+
+Cada agencia tiene su propio administrador con acceso completo al sistema dentro de su agencia. Contrasena uniforme para todos: `Admin2024.`
+
+| Agencia           | Codigo | Cedula       | Contrasena  | Email                               |
+|-------------------|--------|--------------|-------------|-------------------------------------|
+| Agencia Pelileo   | PEL    | 1800000001   | Admin2024.  | admin.pelileo@kullkiwasi.fin.ec     |
+| Agencia Pillaro   | PIL    | 1800000002   | Admin2024.  | admin.pillaro@kullkiwasi.fin.ec     |
+| Agencia Banos     | BAN    | 1800000003   | Admin2024.  | admin.banos@kullkiwasi.fin.ec       |
+| Agencia Salcedo   | SAL    | 1800000004   | Admin2024.  | admin.salcedo@kullkiwasi.fin.ec     |
+| Agencia Quisapincha | QUI  | 1800000005   | Admin2024.  | admin.quisapincha@kullkiwasi.fin.ec |
+
+> Nota: El modulo "Roles y Permisos" muestra unicamente las areas criticas de la agencia en la que el administrador se encuentra logueado.
+
+### Usuarios de Prueba por Rol
+
+Las siguientes cuentas estan registradas en la base de datos para pruebas de cada perfil institucional.
 
 | Rol               | Cedula       | Contrasena    | Modulos accesibles                                      |
 |-------------------|--------------|---------------|---------------------------------------------------------|
-| Administrador     | 0987654321   | admin123      | Todos los modulos y configuracion del sistema           |
 | Empleado          | 1712345678   | empleado123   | Dashboard personal y perfil                             |
 | Talento Humano    | 1234567890   | talento123    | Gestion de empleados y credenciales QR                  |
 | Oficial Riesgos   | 2345678901   | riesgos123    | Consola de alertas e incidentes de seguridad            |
