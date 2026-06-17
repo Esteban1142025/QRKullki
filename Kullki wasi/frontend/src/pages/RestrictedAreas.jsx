@@ -114,15 +114,19 @@ const RestrictedAreas = () => {
   /* ── Crear nueva área ── */
   const handleCreate = async (e) => {
     e.preventDefault();
-    if (!createForm.nombre.trim()) {
-      Swal.fire({ icon: 'warning', title: 'Campo requerido', text: 'El nombre del área es obligatorio.', background: '#ffffff', color: '#1e293b' }); return;
+    const nombreTrimmed = createForm.nombre.trim();
+    if (nombreTrimmed.length < 2) {
+      Swal.fire({ icon: 'warning', title: 'Nombre inválido', text: 'El nombre del área debe tener al menos 2 caracteres.', background: '#ffffff', color: '#1e293b' }); return;
     }
     if (!createForm.schedule) {
-      Swal.fire({ icon: 'warning', title: 'Campo requerido', text: 'Debes seleccionar un horario.', background: '#ffffff', color: '#1e293b' }); return;
+      Swal.fire({ icon: 'warning', title: 'Horario requerido', text: 'Debes seleccionar un horario.', background: '#ffffff', color: '#1e293b' }); return;
+    }
+    if (createForm.scheduleMode === 'custom' && !validateSchedule(createForm.schedule)) {
+      Swal.fire({ icon: 'warning', title: 'Formato inválido', text: 'El horario debe tener el formato HH:MM - HH:MM (Ej: 08:00 - 18:00). También se acepta 24/7.', background: '#ffffff', color: '#1e293b' }); return;
     }
     try {
       await apiClient.post('/areas', {
-        nombre: createForm.nombre.trim(),
+        nombre: nombreTrimmed,
         nivel_riesgo: createForm.riskLevel,
         horario: createForm.schedule,
         id_agencia: createAgencyId || null,
@@ -156,9 +160,20 @@ const RestrictedAreas = () => {
     setEditingArea(area);
   };
 
+  const validateSchedule = (schedule) => {
+    if (!schedule) return false;
+    return /^(\d{2}:\d{2}\s*[-]\s*\d{2}:\d{2})(\s*[,/]\s*\d{2}:\d{2}\s*[-]\s*\d{2}:\d{2})*$/.test(schedule.trim()) || schedule.trim() === '24/7';
+  };
+
   /* ── Guardar área ── */
   const handleSave = async (e) => {
     e.preventDefault();
+    if (!form.schedule) {
+      Swal.fire({ icon: 'warning', title: 'Horario requerido', text: 'Selecciona o ingresa un horario válido.', background: '#ffffff', color: '#1e293b' }); return;
+    }
+    if (form.scheduleMode === 'custom' && !validateSchedule(form.schedule)) {
+      Swal.fire({ icon: 'warning', title: 'Formato inválido', text: 'El horario debe tener el formato HH:MM - HH:MM (Ej: 08:00 - 18:00). También se acepta 24/7.', background: '#ffffff', color: '#1e293b' }); return;
+    }
     try {
       await apiClient.put(`/areas/${editingArea.id_area}`, {
         nivel_riesgo: form.riskLevel,
@@ -320,8 +335,8 @@ const RestrictedAreas = () => {
 
       {/* ── MODAL DE CREACIÓN ────────────────────────────────────────────────── */}
       {showCreate && canManageAreas && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xl flex flex-col" style={{maxHeight: 'calc(100vh - 2rem)'}}>
 
             <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between shrink-0">
               <h3 className="text-sm font-black text-slate-800 font-['Outfit'] uppercase tracking-wider flex items-center gap-2">
@@ -414,7 +429,7 @@ const RestrictedAreas = () => {
               </form>
             </div>
 
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 shrink-0 flex justify-end">
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end shrink-0">
               <button type="submit" form="create-area-form"
                 className="flex items-center gap-2 px-5 py-2.5 bg-[#84cc16] hover:bg-[#65a30d] rounded-xl text-sm font-bold text-white shadow-md transition-all">
                 <MdSave size={18} /> Crear Área
@@ -426,8 +441,9 @@ const RestrictedAreas = () => {
 
       {/* ── MODAL DE EDICIÓN ────────────────────────────────────────────────── */}
       {editingArea && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] overflow-y-auto">
+          <div className="flex min-h-full items-start justify-center p-4">
+            <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xl my-4">
 
             {/* Cabecera */}
             <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between shrink-0">
@@ -437,8 +453,6 @@ const RestrictedAreas = () => {
               <button onClick={() => setEditingArea(null)} className="text-slate-400 hover:text-slate-600"><MdClose size={20} /></button>
             </div>
 
-            {/* Cuerpo scrollable */}
-            <div className="overflow-y-auto flex-1">
               <form onSubmit={handleSave} id="edit-area-form" className="p-6 space-y-5">
 
                 {/* Nivel de riesgo */}
@@ -584,14 +598,14 @@ const RestrictedAreas = () => {
                   </div>
                 </div>
               </form>
-            </div>
 
             {/* Footer fijo */}
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 shrink-0 flex justify-end">
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end">
               <button type="submit" form="edit-area-form"
                 className="flex items-center gap-2 px-5 py-2.5 bg-[#84cc16] hover:bg-[#65a30d] rounded-xl text-sm font-bold text-white shadow-md transition-all">
                 <MdSave size={18} /> Guardar Cambios
               </button>
+            </div>
             </div>
           </div>
         </div>
@@ -599,7 +613,7 @@ const RestrictedAreas = () => {
 
       {/* ── MODAL HISTORIAL ── */}
       {showHistory && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="w-full max-w-2xl bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh]">
             <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
               <h3 className="text-sm font-black text-slate-800 font-['Outfit'] uppercase tracking-wider flex items-center gap-2">

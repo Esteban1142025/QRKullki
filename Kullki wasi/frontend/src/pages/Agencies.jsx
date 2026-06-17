@@ -63,16 +63,23 @@ const Agencies = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.id || !form.name) {
-      Swal.fire({ icon: 'error', title: 'Campos requeridos', text: 'El Código y el Nombre son obligatorios.' });
+    const trimmedId   = form.id.trim().toUpperCase();
+    const trimmedName = form.name.trim();
+
+    if (!editing && (!trimmedId || trimmedId.length < 2 || trimmedId.length > 5)) {
+      Swal.fire({ icon: 'error', title: 'Código inválido', text: 'El código debe tener entre 2 y 5 caracteres alfanuméricos.', background: '#ffffff', color: '#1e293b' });
+      return;
+    }
+    if (trimmedName.length < 2) {
+      Swal.fire({ icon: 'error', title: 'Nombre inválido', text: 'El nombre de la agencia debe tener al menos 2 caracteres.', background: '#ffffff', color: '#1e293b' });
       return;
     }
 
     const payload = {
-      nombre: form.name,
-      codigo: form.id.toUpperCase(),
-      direccion: form.address,
-      telefono: form.phone,
+      nombre: trimmedName,
+      codigo: trimmedId || undefined,
+      direccion: form.address.trim() || undefined,
+      telefono: form.phone || undefined,
       tipo: form.type,
       estado: form.status === 'Activo',
     };
@@ -228,12 +235,13 @@ const Agencies = () => {
                   <input
                     type="text"
                     value={form.id}
-                    onChange={e => setForm({...form, id: e.target.value.toUpperCase()})}
+                    onChange={e => setForm({...form, id: e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 5)})}
                     placeholder="Ej: MAT, PEL, PIL..."
+                    maxLength={5}
                     disabled={!!editing}
                     className="form-input disabled:bg-slate-100 disabled:text-slate-400"
                   />
-                  <p className="text-[10px] text-slate-400">Código único de 3 letras. No editable tras crear.</p>
+                  <p className="text-[10px] text-slate-400">2–5 caracteres alfanuméricos. No editable tras crear.</p>
                 </div>
                 <div className="space-y-1.5">
                   <label className="form-label">Tipo de Agencia</label>
@@ -274,12 +282,14 @@ const Agencies = () => {
                 <div className="space-y-1.5">
                   <label className="form-label">Teléfono</label>
                   <input
-                    type="text"
+                    type="tel"
                     value={form.phone}
-                    onChange={e => setForm({...form, phone: e.target.value})}
-                    placeholder="Ej: (03) 282-1234"
+                    onChange={e => setForm({...form, phone: e.target.value.replace(/\D/g, '').slice(0, 15)})}
+                    placeholder="Ej: 032821234"
+                    maxLength={15}
                     className="form-input"
                   />
+                  <p className="text-[10px] text-slate-400">Solo dígitos, máximo 15</p>
                 </div>
                 <div className="space-y-1.5">
                   <label className="form-label">Estado Operacional</label>

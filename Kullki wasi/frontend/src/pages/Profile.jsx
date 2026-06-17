@@ -39,12 +39,20 @@ const Profile = () => {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (!form.firstName.trim() || !form.lastName.trim()) {
+      Swal.fire({ icon: 'warning', title: 'Campos requeridos', text: 'Los nombres y apellidos no pueden estar vacíos.', background: '#ffffff', color: '#1e293b' });
+      return;
+    }
+    if (form.newPassword && form.newPassword.length < 6) {
+      Swal.fire({ icon: 'warning', title: 'Contraseña muy corta', text: 'La nueva contraseña debe tener al menos 6 caracteres.', background: '#ffffff', color: '#1e293b' });
+      return;
+    }
     if (form.newPassword && form.newPassword !== form.confirmPassword) {
-      Swal.fire({ icon: 'error', title: 'Contraseñas distintas', text: 'La nueva contraseña y su confirmación no coinciden.' });
+      Swal.fire({ icon: 'error', title: 'Contraseñas distintas', text: 'La nueva contraseña y su confirmación no coinciden.', background: '#ffffff', color: '#1e293b' });
       return;
     }
     if (form.newPassword && !form.currentPassword) {
-      Swal.fire({ icon: 'warning', title: 'Contraseña requerida', text: 'Debes ingresar tu contraseña actual para poder cambiarla.' });
+      Swal.fire({ icon: 'warning', title: 'Contraseña requerida', text: 'Debes ingresar tu contraseña actual para poder cambiarla.', background: '#ffffff', color: '#1e293b' });
       return;
     }
     setSaving(true);
@@ -140,9 +148,10 @@ const Profile = () => {
                       <span>Nueva Contraseña</span>
                       {pwStrength.text && <span className="text-[10px] text-slate-400">{pwStrength.text}</span>}
                     </label>
-                    <input type="password" value={form.newPassword}
+                    <input type="password" value={form.newPassword} minLength={6}
                       onChange={e => setForm({ ...form, newPassword: e.target.value })}
                       placeholder="••••••••" className="form-input w-full" />
+                    <p className="text-[10px] text-slate-400">Mínimo 6 caracteres</p>
                     {form.newPassword && (
                       <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
                         <div className={`h-full transition-all ${pwStrength.color}`} style={{ width: `${pwStrength.score}%` }} />

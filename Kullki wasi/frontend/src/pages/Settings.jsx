@@ -63,6 +63,12 @@ const Settings = () => {
     if (!f) return;
     if (!f.name.endsWith('.json')) {
       Swal.fire({ icon: 'error', title: 'Archivo inválido', text: 'Solo se aceptan archivos .json generados por esta plataforma.' });
+      e.target.value = '';
+      return;
+    }
+    if (f.size > 10 * 1024 * 1024) {
+      Swal.fire({ icon: 'error', title: 'Archivo demasiado grande', text: 'El archivo de respaldo no puede superar 10 MB.' });
+      e.target.value = '';
       return;
     }
     setRestoringFile(f);
@@ -116,8 +122,23 @@ const Settings = () => {
   /* ── Guardar config ──────────────────────────────────── */
   const handleSaveConfig = (e) => {
     e.preventDefault();
+    const timeout = parseInt(config.sessionTimeout, 10);
+    if (isNaN(timeout) || timeout < 1 || timeout > 480) {
+      Swal.fire({ icon: 'warning', title: 'Valor inválido', text: 'El tiempo de sesión debe estar entre 1 y 480 minutos.', background: '#ffffff', color: '#1e293b' });
+      return;
+    }
+    const retention = parseInt(config.logRetention, 10);
+    if (isNaN(retention) || retention < 1 || retention > 3650) {
+      Swal.fire({ icon: 'warning', title: 'Valor inválido', text: 'La retención de bitácoras debe estar entre 1 y 3650 días.', background: '#ffffff', color: '#1e293b' });
+      return;
+    }
+    const endpoint = config.apiEndpoint.trim();
+    if (!endpoint || !/^https?:\/\/.+/.test(endpoint)) {
+      Swal.fire({ icon: 'warning', title: 'URL inválida', text: 'El endpoint debe ser una URL válida que comience con http:// o https://.', background: '#ffffff', color: '#1e293b' });
+      return;
+    }
     try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(config));
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...config, sessionTimeout: String(timeout), logRetention: String(retention), apiEndpoint: endpoint }));
       Swal.fire({
         icon: 'success', title: 'Configuración Guardada',
         text: 'Los parámetros han sido actualizados correctamente.',
@@ -148,18 +169,22 @@ const Settings = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="space-y-1.5">
                 <label className="form-label">Tiempo de Sesión (Minutos)</label>
-                <input type="number" value={config.sessionTimeout}
+                <input type="number" value={config.sessionTimeout} min="1" max="480"
                   onChange={e => setConfig({ ...config, sessionTimeout: e.target.value })} className="form-input w-full" />
+                <p className="text-[10px] text-slate-400">Entre 1 y 480 minutos</p>
               </div>
               <div className="space-y-1.5">
                 <label className="form-label">Retención de Bitácoras (Días)</label>
-                <input type="number" value={config.logRetention}
+                <input type="number" value={config.logRetention} min="1" max="3650"
                   onChange={e => setConfig({ ...config, logRetention: e.target.value })} className="form-input w-full" />
+                <p className="text-[10px] text-slate-400">Entre 1 y 3650 días (máx. 10 años)</p>
               </div>
               <div className="space-y-1.5 sm:col-span-2">
                 <label className="form-label">Endpoint API Backend</label>
-                <input type="text" value={config.apiEndpoint}
-                  onChange={e => setConfig({ ...config, apiEndpoint: e.target.value })} className="form-input w-full font-mono" />
+                <input type="url" value={config.apiEndpoint}
+                  onChange={e => setConfig({ ...config, apiEndpoint: e.target.value })} className="form-input w-full font-mono"
+                  placeholder="http://localhost:3001" />
+                <p className="text-[10px] text-slate-400">Debe comenzar con http:// o https://</p>
               </div>
             </div>
 

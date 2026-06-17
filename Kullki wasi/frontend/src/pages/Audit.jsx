@@ -701,24 +701,34 @@ ul{padding-left:16px;margin-top:4px}li{font-size:11px;margin-bottom:5px;line-hei
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Fecha Inicio</label>
-                  <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:border-[#8DC63F] outline-none" />
+                  <input type="date" value={startDate}
+                    max={new Date().toISOString().split('T')[0]}
+                    onChange={e => { setStartDate(e.target.value); if (endDate && e.target.value > endDate) setEndDate(''); }}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:border-[#8DC63F] outline-none" />
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Fecha Fin (Opcional)</label>
-                  <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:border-[#8DC63F] outline-none" />
+                  <input type="date" value={endDate}
+                    min={startDate || undefined}
+                    max={new Date().toISOString().split('T')[0]}
+                    onChange={e => setEndDate(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:border-[#8DC63F] outline-none" />
                 </div>
               </div>
+              {startDate && endDate && endDate < startDate && (
+                <p className="text-[11px] text-red-500 font-medium">La fecha fin no puede ser anterior a la fecha inicio.</p>
+              )}
               <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100 mt-2">
-                <button 
-                  onClick={() => { handleExportPDF(); setShowExportModal(false); }} 
-                  disabled={!startDate}
+                <button
+                  onClick={() => { handleExportPDF(); setShowExportModal(false); }}
+                  disabled={!startDate || (!!endDate && endDate < startDate)}
                   className="btn-secondary text-red-500 disabled:opacity-40"
                 >
                   <MdPictureAsPdf size={16} /> Exportar PDF
                 </button>
-                <button 
-                  onClick={() => { handleExportExcel(); setShowExportModal(false); }} 
-                  disabled={!startDate}
+                <button
+                  onClick={() => { handleExportExcel(); setShowExportModal(false); }}
+                  disabled={!startDate || (!!endDate && endDate < startDate)}
                   className="btn-secondary text-green-600 disabled:opacity-40"
                 >
                   <MdDescription size={16} /> Exportar Excel

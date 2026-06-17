@@ -32,8 +32,11 @@ const QRScanner = () => {
       setEmployees(empRes.data);
       setDevices(devRes.data);
       setAreas(areaRes.data);
-      if (devRes.data.length > 0) setSelectedDeviceId(devRes.data[0].id);
-      if (empRes.data.length > 0) setSelectedEmpId(empRes.data[0].id);
+      const agencyCode = user?.agency;
+      const agencyDevs = agencyCode ? devRes.data.filter(d => d.agency === agencyCode) : devRes.data;
+      const agencyEmps = agencyCode ? empRes.data.filter(e => e.agency === agencyCode) : empRes.data;
+      setSelectedDeviceId(agencyDevs.length > 0 ? agencyDevs[0].id : '');
+      setSelectedEmpId(agencyEmps.length > 0 ? agencyEmps[0].id : '');
     } catch (err) {
       console.error('Error al cargar datos del simulador:', err);
       Swal.fire({ icon: 'error', title: 'Error de conexión', text: 'No se pudo cargar los datos del simulador.' });
@@ -44,12 +47,30 @@ const QRScanner = () => {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Dispositivo activo
-  const device = devices.find(d => d.id === selectedDeviceId) ?? devices[0];
+  // Resetear selección cuando el usuario cambia de agencia
+  useEffect(() => {
+    if (devices.length === 0) return;
+    const code = user?.agency;
+    const fd = code ? devices.filter(d => d.agency === code) : devices;
+    const fe = code ? employees.filter(e => e.agency === code) : employees;
+    setSelectedDeviceId(fd.length > 0 ? fd[0].id : '');
+    setSelectedEmpId(fe.length > 0 ? fe[0].id : '');
+    setValidationResult(null);
+    setScannedQR('');
+  }, [user?.agency]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Área del dispositivo activo (match por nombre)
+  // Filtros derivados por agencia activa — reactivos a cualquier cambio de user.agency
+  const effectiveAgency   = user?.agency;
+  const agencyDevices     = effectiveAgency ? devices.filter(d => d.agency === effectiveAgency) : devices;
+  const agencyAreas       = effectiveAgency ? areas.filter(a => a.agency === effectiveAgency) : areas;
+  const agencyEmployees   = effectiveAgency ? employees.filter(e => e.agency === effectiveAgency) : employees;
+
+  // Dispositivo activo (dentro de los de la agencia)
+  const device = agencyDevices.find(d => d.id === selectedDeviceId) ?? agencyDevices[0];
+
+  // Área del dispositivo activo
   const area = device
-    ? areas.find(a => a.name === device.area) ?? areas[0]
+    ? agencyAreas.find(a => a.name === device.area) ?? agencyAreas[0]
     : null;
 
   // ── Lógica de validación ────────────────────────────────
@@ -150,11 +171,14 @@ const QRScanner = () => {
     );
   }
 
-  if (devices.length === 0) {
+  if (agencyDevices.length === 0) {
     return (
       <div className="p-10 text-center text-slate-500 text-sm border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
         <MdDevices size={36} className="mx-auto mb-3 text-slate-300" />
-        <p className="font-semibold">No hay dispositivos registrados en la base de datos.</p>
+        <p className="font-semibold">No hay lectores registrados para esta agencia.</p>
+        <p className="text-xs mt-1 text-slate-400">
+          Configure dispositivos para esta agencia en el módulo de Áreas Críticas.
+        </p>
         <button onClick={loadData} className="mt-4 btn-primary text-xs">
           <MdRefresh size={14} /> Reintentar
         </button>
@@ -190,7 +214,7 @@ const QRScanner = () => {
               onChange={e => { setSelectedDeviceId(e.target.value); reset(); }}
               className="w-full"
             >
-              {devices.map(d => (
+              {agencyDevices.map(d => (
                 <option key={d.id} value={d.id}>{d.name} — {d.status}</option>
               ))}
             </select>
@@ -233,7 +257,7 @@ const QRScanner = () => {
                   onChange={e => setSelectedEmpId(e.target.value)}
                   className="flex-1 text-[11px] bg-slate-50"
                 >
-                  {employees.map(e => (
+                  {agencyEmployees.map(e => (
                     <option key={e.id} value={e.id}>{e.name} ({e.status})</option>
                   ))}
                 </select>

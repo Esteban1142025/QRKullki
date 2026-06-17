@@ -115,15 +115,27 @@ const DashboardAdmin = () => {
     fetchAll();
   }, []);
 
-  const activeEmployees   = employees.filter(e => e.status === 'Activo').length;
-  const activeAgencies    = agencies.filter(a => a.status === 'Activo').length;
-  const activeAlerts      = alerts.filter(a => !a.isResolved && a.status !== 'RESUELTA').length;
-  const credentialsCount  = employees.length;
-  const todayStr          = new Date().toDateString();
-  const accessToday       = logs.filter(l => new Date(l.timestamp).toDateString() === todayStr).length;
+  // Agencia activa — reactivo al switcher del layout
+  const effectiveAgency = user?.agency;
 
-  // Gráfica horaria — rango dinámico según logs reales del día (mínimo 06:00–18:00)
-  const todayLogs = logs.filter(l => new Date(l.timestamp).toDateString() === todayStr);
+  const agencyEmployees = effectiveAgency
+    ? employees.filter(e => e.agency === effectiveAgency)
+    : employees;
+  const agencyLogs = effectiveAgency
+    ? logs.filter(l => l.agency === effectiveAgency)
+    : logs;
+  const agencyAlerts = effectiveAgency
+    ? alerts.filter(a => !a.agency || a.agency === effectiveAgency)
+    : alerts;
+
+  const activeEmployees   = agencyEmployees.filter(e => e.status === 'Activo').length;
+  const activeAgencies    = agencies.filter(a => a.status === 'Activo').length; // global — red completa
+  const activeAlerts      = agencyAlerts.filter(a => !a.isResolved && a.status !== 'RESUELTA').length;
+  const credentialsCount  = agencyEmployees.length;
+  const todayStr          = new Date().toDateString();
+
+  // Gráfica horaria — filtrada por agencia activa, rango dinámico (mínimo 06:00–18:00)
+  const todayLogs  = agencyLogs.filter(l => new Date(l.timestamp).toDateString() === todayStr);
   const todayHours = todayLogs.map(l => new Date(l.timestamp).getHours());
   const minH = todayHours.length > 0 ? Math.min(...todayHours, 6)  : 6;
   const maxH = todayHours.length > 0 ? Math.max(...todayHours, 18) : 18;
@@ -143,11 +155,13 @@ const DashboardAdmin = () => {
   });
   const accessTimeData = Object.values(hourBuckets);
 
+  // "Actividad por Sucursal" — siempre global (es comparativa), resalta la agencia activa
   const agencyData = agencies.map(a => ({
-    name: a.name.replace('Agencia ', '').replace('Matriz ', 'Matriz'),
+    name: a.name.replace(/^Agencia\s+/, '').replace(/^Matriz\s+/, ''),
     Accesos: logs.filter(l => l.agency === a.id).length,
     Alertas: alerts.filter(al => al.agency === a.id).length,
-  })).filter(a => a.Accesos > 0 || a.Accesos === 0);
+    isActive: a.id === effectiveAgency,
+  }));
 
   return (
     <div className="space-y-6">
@@ -182,7 +196,7 @@ const DashboardAdmin = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
           label="Total Personal"
-          value={loading ? '…' : employees.length}
+          value={loading ? '…' : agencyEmployees.length}
           sub={`${activeEmployees} colaboradores activos`}
           subColor="text-[#8DC63F]"
           icon={MdSupervisedUserCircle}
@@ -277,19 +291,19 @@ const DashboardAdmin = () => {
               <MdRouter size={16} className="text-[#8DC63F]" />
               Actividad por Sucursal
             </h3>
-            <p className="text-[10px] text-slate-500 mt-0.5">Comparativa de empleados y alertas entre agencias</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">Comparativa global — agencia activa resaltada en verde</p>
           </div>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={agencyData.length > 0 ? agencyData : agencies.map(a => ({ name: a.id, Empleados: employees.filter(e => e.agency === a.id).length, Alertas: 0 }))} margin={{ top: 5, right: 5, left: -28, bottom: 0 }}>
+              <BarChart data={agencyData} margin={{ top: 5, right: 5, left: -28, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} />
                 <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '8px', color: '#64748b' }} />
                 <Bar dataKey="Accesos" radius={[6, 6, 0, 0]}>
-                  {(agencyData.length > 0 ? agencyData : agencies).map((_, i) => (
-                    <Cell key={i} fill={i === 0 ? '#8DC63F' : '#cbd5e1'} />
+                  {agencyData.map((entry, i) => (
+                    <Cell key={i} fill={entry.isActive ? '#8DC63F' : '#cbd5e1'} />
                   ))}
                 </Bar>
                 <Bar dataKey="Alertas" fill="#ef4444" radius={[6, 6, 0, 0]} />
@@ -320,7 +334,7 @@ const DashboardAdmin = () => {
           </div>
 
           <div className="space-y-2 overflow-y-auto max-h-72 flex-1 pr-1">
-            {logs.length > 0 ? logs.slice(0, 7).map((log) => {
+            {agencyLogs.length > 0 ? agencyLogs.slice(0, 7).map((log) => {
               const ok = log.status === 'Autorizado';
               const initials = (log.name || 'U').split(' ').filter(Boolean).map(n => n[0]).slice(0, 2).join('').toUpperCase();
               return (

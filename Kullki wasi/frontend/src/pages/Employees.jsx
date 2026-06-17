@@ -28,7 +28,7 @@ const DEPARTMENTS = [
 const BLANK_FORM = {
   id: '', id_empleado: null, dni: '', name: '', role: 'empleado',
   department: 'Caja y Servicios', agency: 'MAT', email: '', phone: '',
-  status: 'Activo', hireDate: '',
+  status: 'Activo', hireDate: '', password: '', confirmPassword: '',
 };
 
 const Employees = () => {
@@ -225,6 +225,8 @@ const Employees = () => {
       phone: emp.phone || '',
       status: emp.status,
       hireDate: emp.hireDate || '',
+      password: '',
+      confirmPassword: '',
     });
     setEditing(emp);
     setShowForm(true);
@@ -262,8 +264,21 @@ const Employees = () => {
       return;
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-      fireSwal({ icon: 'error', title: 'Correo inválido', text: 'Ingrese una dirección de correo válida.' });
+    if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(form.email)) {
+      fireSwal({ icon: 'error', title: 'Correo inválido', text: 'Ingrese una dirección de correo electrónico válida (Ej: usuario@dominio.com).' });
+      return;
+    }
+
+    if (!editing && !form.password) {
+      fireSwal({ icon: 'error', title: 'Contraseña requerida', text: 'Debe asignar una contraseña de acceso al nuevo colaborador.' });
+      return;
+    }
+    if (form.password && form.password.length < 6) {
+      fireSwal({ icon: 'error', title: 'Contraseña muy corta', text: 'La contraseña debe tener al menos 6 caracteres.' });
+      return;
+    }
+    if (form.password && form.password !== form.confirmPassword) {
+      fireSwal({ icon: 'error', title: 'Contraseñas no coinciden', text: 'La contraseña y su confirmación no coinciden.' });
       return;
     }
 
@@ -286,6 +301,7 @@ const Employees = () => {
       departamento: form.department,
       estado_laboral: form.status === 'Activo' ? 'ACTIVO' : 'INACTIVO',
       role_ids,
+      ...(form.password ? { password: form.password } : {}),
     };
 
     try {
@@ -471,8 +487,9 @@ const Employees = () => {
 
       {/* MODAL: FORM */}
       {showForm && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="w-full max-w-xl bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xl my-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="w-full max-w-2xl bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xl my-4">
             <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
               <h3 className="text-sm font-black text-slate-800 font-['Outfit'] uppercase tracking-wider">
                 {editing ? 'Editar Expediente' : 'Nuevo Colaborador'}
@@ -523,6 +540,34 @@ const Employees = () => {
                   </select>
                 </div>
               </div>
+              <div className="pt-3 border-t border-slate-100">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-3">
+                  {editing ? 'Restablecer Contraseña (opcional)' : 'Contraseña de Acceso al Sistema'}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="form-label">{editing ? 'Nueva Contraseña' : 'Contraseña *'}</label>
+                    <input
+                      type="password"
+                      placeholder="Mínimo 6 caracteres"
+                      value={form.password}
+                      onChange={e => field('password', e.target.value)}
+                      className="form-input"
+                      minLength={6}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="form-label">Confirmar Contraseña {editing ? '' : '*'}</label>
+                    <input
+                      type="password"
+                      placeholder="Repita la contraseña"
+                      value={form.confirmPassword}
+                      onChange={e => field('confirmPassword', e.target.value)}
+                      className="form-input"
+                    />
+                  </div>
+                </div>
+              </div>
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-2">
                 <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">Cancelar</button>
                 <button type="submit" className="btn-primary">
@@ -530,6 +575,7 @@ const Employees = () => {
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy import text as sa_text
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -10,6 +11,7 @@ import models
 import datetime
 import bcrypt
 import jwt
+import re
 
 # Convierte un datetime naive (guardado en UTC) a string ISO 8601 con sufijo Z
 # para que JavaScript lo interprete correctamente como UTC y muestre la hora local del cliente
@@ -36,11 +38,9 @@ ROLE_DEPARTMENTS = {
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     if not hashed_password:
         return False
-    if hashed_password == plain_password:
-        return True
     try:
         return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
-    except:
+    except Exception:
         return False
 
 def create_access_token(data: dict, expires_delta: Optional[datetime.timedelta] = None):
@@ -125,6 +125,20 @@ def get_db():
     finally:
         db.close()
 
+_http_bearer = HTTPBearer(auto_error=False)
+
+def require_admin(credentials: HTTPAuthorizationCredentials = Depends(_http_bearer)):
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Token requerido")
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        roles = payload.get("roles", [])
+    except Exception:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
+    if "admin" not in roles:
+        raise HTTPException(status_code=403, detail="Solo el administrador puede realizar esta acción")
+    return roles
+
 # --- Schemas ---
 
 class LoginRequest(BaseModel):
@@ -140,6 +154,10 @@ class LoginRequest(BaseModel):
             raise ValueError('La cédula debe tener exactamente 10 dígitos')
         return v
 
+_EMAIL_RE = re.compile(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
+_NIVELES_RIESGO = ('Bajo', 'Medio', 'Alto', 'Crítico')
+_HORARIO_RE = re.compile(r'^(\d{2}:\d{2}\s*[-,/]\s*\d{2}:\d{2}(\s*[,/]\s*\d{2}:\d{2}\s*[-]\s*\d{2}:\d{2})*)$|^24/7$')
+
 class EmpleadoCreate(BaseModel):
     identificacion: str
     nombres: str
@@ -149,6 +167,47 @@ class EmpleadoCreate(BaseModel):
     departamento: Optional[str] = None
     estado_laboral: str = "ACTIVO"
     role_ids: List[int] = []
+    password: Optional[str] = None
+
+    @field_validator('identificacion')
+    @classmethod
+    def validate_identificacion(cls, v):
+        v = v.strip()
+        if not v.isdigit() or len(v) != 10:
+            raise ValueError('La cédula debe tener exactamente 10 dígitos numéricos')
+        return v
+
+    @field_validator('nombres', 'apellidos')
+    @classmethod
+    def validate_nombre_campo(cls, v):
+        v = v.strip()
+        if len(v) < 2:
+            raise ValueError('Debe tener al menos 2 caracteres')
+        return v
+
+    @field_validator('email')
+    @classmethod
+    def validate_email(cls, v):
+        if not v:
+            return v
+        v = v.strip().lower()
+        if not _EMAIL_RE.match(v):
+            raise ValueError('Formato de correo electrónico inválido')
+        return v
+
+    @field_validator('estado_laboral')
+    @classmethod
+    def validate_estado(cls, v):
+        if v not in ('ACTIVO', 'INACTIVO'):
+            raise ValueError('Estado debe ser ACTIVO o INACTIVO')
+        return v
+
+    @field_validator('password')
+    @classmethod
+    def validate_password_field(cls, v):
+        if v is not None and len(v) < 6:
+            raise ValueError('La contraseña debe tener al menos 6 caracteres')
+        return v
 
 class AgenciaCreate(BaseModel):
     nombre: str
@@ -158,15 +217,92 @@ class AgenciaCreate(BaseModel):
     tipo: str = "Sucursal"
     estado: bool = True
 
+    @field_validator('nombre')
+    @classmethod
+    def validate_nombre_agencia(cls, v):
+        v = v.strip()
+        if len(v) < 2:
+            raise ValueError('El nombre debe tener al menos 2 caracteres')
+        return v
+
+    @field_validator('codigo')
+    @classmethod
+    def validate_codigo(cls, v):
+        if not v:
+            return v
+        v = v.strip().upper()
+        if not v.isalnum() or not (2 <= len(v) <= 5):
+            raise ValueError('El código debe tener entre 2 y 5 caracteres alfanuméricos')
+        return v
+
+    @field_validator('telefono')
+    @classmethod
+    def validate_telefono(cls, v):
+        if not v:
+            return v
+        digits = re.sub(r'\D', '', v)
+        if not digits:
+            return None
+        if len(digits) > 15:
+            raise ValueError('El teléfono no puede superar 15 dígitos')
+        return digits
+
+    @field_validator('tipo')
+    @classmethod
+    def validate_tipo(cls, v):
+        if v not in ('Principal', 'Sucursal', 'Extensión'):
+            raise ValueError('Tipo de agencia inválido')
+        return v
+
 class AreaUpdate(BaseModel):
     nivel_riesgo: Optional[str] = None
     horario: Optional[str] = None
+
+    @field_validator('nivel_riesgo')
+    @classmethod
+    def validate_nivel(cls, v):
+        if v is not None and v not in _NIVELES_RIESGO:
+            raise ValueError(f'Nivel de riesgo inválido. Opciones: {", ".join(_NIVELES_RIESGO)}')
+        return v
+
+    @field_validator('horario')
+    @classmethod
+    def validate_horario(cls, v):
+        if v is None:
+            return v
+        v = v.strip()
+        if v and not _HORARIO_RE.match(v):
+            raise ValueError('Formato de horario inválido. Use HH:MM - HH:MM o 24/7')
+        return v
 
 class AreaCreate(BaseModel):
     nombre: str
     nivel_riesgo: str = "Bajo"
     horario: str = "08:00 - 18:00"
     id_agencia: Optional[int] = None
+
+    @field_validator('nombre')
+    @classmethod
+    def validate_nombre_area(cls, v):
+        v = v.strip()
+        if len(v) < 2:
+            raise ValueError('El nombre debe tener al menos 2 caracteres')
+        return v
+
+    @field_validator('nivel_riesgo')
+    @classmethod
+    def validate_nivel_area(cls, v):
+        if v not in _NIVELES_RIESGO:
+            raise ValueError(f'Nivel de riesgo inválido. Opciones: {", ".join(_NIVELES_RIESGO)}')
+        return v
+
+    @field_validator('horario')
+    @classmethod
+    def validate_horario_area(cls, v):
+        v = v.strip()
+        if not _HORARIO_RE.match(v):
+            raise ValueError('Formato de horario inválido. Use HH:MM - HH:MM o 24/7')
+        return v
 
 # --- Auth ---
 
@@ -223,6 +359,31 @@ class ProfileUpdate(BaseModel):
     current_password: Optional[str] = None
     new_password: Optional[str] = None
 
+    @field_validator('nombres', 'apellidos')
+    @classmethod
+    def validate_nombre_perfil(cls, v):
+        v = v.strip()
+        if len(v) < 1:
+            raise ValueError('El campo no puede estar vacío')
+        return v
+
+    @field_validator('email')
+    @classmethod
+    def validate_email_perfil(cls, v):
+        if not v:
+            return v
+        v = v.strip().lower()
+        if not _EMAIL_RE.match(v):
+            raise ValueError('Formato de correo electrónico inválido')
+        return v
+
+    @field_validator('new_password')
+    @classmethod
+    def validate_password(cls, v):
+        if v is not None and len(v) < 6:
+            raise ValueError('La contraseña debe tener al menos 6 caracteres')
+        return v
+
 @app.patch("/api/v1/auth/profile/{cedula}")
 def update_profile(cedula: str, data: ProfileUpdate, db: Session = Depends(get_db)):
     """Actualiza nombre, correo y/o contraseña del usuario autenticado."""
@@ -260,7 +421,7 @@ def update_profile(cedula: str, data: ProfileUpdate, db: Session = Depends(get_d
 # --- Backup / Restore ---
 
 @app.get("/api/v1/backup")
-def exportar_backup(db: Session = Depends(get_db)):
+def exportar_backup(db: Session = Depends(get_db), _roles: list = Depends(require_admin)):
     """Exporta toda la BD a JSON para respaldo."""
     import json
 
@@ -299,17 +460,26 @@ async def restaurar_backup(db: Session = Depends(get_db), file: bytes = None):
 from fastapi import UploadFile, File
 
 @app.post("/api/v1/restore/upload")
-async def restaurar_backup_upload(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def restaurar_backup_upload(file: UploadFile = File(...), db: Session = Depends(get_db), _roles: list = Depends(require_admin)):
     """Recibe un archivo JSON de respaldo y restaura los datos."""
     import json
     try:
         content = await file.read()
+        if len(content) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Archivo demasiado grande (máximo 10 MB)")
         data = json.loads(content)
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=400, detail="Archivo JSON inválido o corrupto")
 
     if data.get("version") != "1.0":
         raise HTTPException(status_code=400, detail="Versión de respaldo no compatible")
+
+    required_keys = {'agencias', 'permisos', 'roles', 'empleados'}
+    missing = required_keys - set(data.keys())
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Respaldo incompleto: faltan las secciones {missing}")
 
     try:
         # --- Limpiar en orden inverso de dependencias ---
@@ -450,10 +620,15 @@ def crear_empleado(data: EmpleadoCreate, db: Session = Depends(get_db)):
         id_agencia_base=data.id_agencia_base,
         departamento=data.departamento,
         estado_laboral=data.estado_laboral,
+        password_hash=bcrypt.hashpw(data.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8') if data.password else None,
     )
     if data.role_ids:
         roles = db.query(models.Rol).filter(models.Rol.id_rol.in_(data.role_ids)).all()
         e.roles = roles
+    else:
+        default_role = db.query(models.Rol).filter(models.Rol.nombre == 'empleado').first()
+        if default_role:
+            e.roles = [default_role]
 
     db.add(e)
     db.commit()
@@ -487,6 +662,8 @@ def actualizar_empleado(id_empleado: int, data: EmpleadoCreate, db: Session = De
     e.id_agencia_base = data.id_agencia_base
     e.departamento = data.departamento
     e.estado_laboral = data.estado_laboral
+    if data.password:
+        e.password_hash = bcrypt.hashpw(data.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
     if data.role_ids:
         roles = db.query(models.Rol).filter(models.Rol.id_rol.in_(data.role_ids)).all()
         e.roles = roles
@@ -535,6 +712,13 @@ def actualizar_agencia(id_agencia: int, data: AgenciaCreate, db: Session = Depen
     a = db.query(models.Agencia).filter(models.Agencia.id_agencia == id_agencia).first()
     if not a:
         raise HTTPException(status_code=404, detail="Agencia no encontrada")
+    if data.codigo and data.codigo.upper() != (a.codigo or ''):
+        dup = db.query(models.Agencia).filter(
+            models.Agencia.codigo == data.codigo.upper(),
+            models.Agencia.id_agencia != id_agencia
+        ).first()
+        if dup:
+            raise HTTPException(status_code=400, detail="Ya existe otra agencia con ese código")
     a.nombre = data.nombre
     if data.codigo:
         a.codigo = data.codigo.upper()
@@ -637,16 +821,7 @@ def actualizar_rol(id_rol: int, data: dict, db: Session = Depends(get_db)):
     if not rol:
         raise HTTPException(status_code=404, detail="Rol no encontrado")
     permisos_codigos = data.get("permissions", [])
-    # Buscar permisos existentes
     permisos = db.query(models.Permiso).filter(models.Permiso.codigo_permiso.in_(permisos_codigos)).all()
-    # Crear permisos faltantes
-    existing_codes = {p.codigo_permiso for p in permisos}
-    for code in permisos_codigos:
-        if code not in existing_codes:
-            nuevo = models.Permiso(codigo_permiso=code, descripcion=code)
-            db.add(nuevo)
-            db.flush()
-            permisos.append(nuevo)
     rol.permisos = permisos
     db.commit()
     db.refresh(rol)
