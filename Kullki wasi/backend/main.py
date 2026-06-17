@@ -162,6 +162,12 @@ class AreaUpdate(BaseModel):
     nivel_riesgo: Optional[str] = None
     horario: Optional[str] = None
 
+class AreaCreate(BaseModel):
+    nombre: str
+    nivel_riesgo: str = "Bajo"
+    horario: str = "08:00 - 18:00"
+    id_agencia: Optional[int] = None
+
 # --- Auth ---
 
 @app.post("/api/v1/auth/login")
@@ -584,6 +590,20 @@ def listar_areas(db: Session = Depends(get_db)):
             "agency": agencia_codigo,
         })
     return result
+
+@app.post("/api/v1/areas")
+def crear_area(data: AreaCreate, db: Session = Depends(get_db)):
+    a = models.AreaRestringida(
+        nombre=data.nombre,
+        nivel_riesgo=data.nivel_riesgo,
+        horario=data.horario,
+        id_agencia=data.id_agencia,
+        estado=True,
+    )
+    db.add(a)
+    db.commit()
+    db.refresh(a)
+    return {"id": f"AR-{a.id_area}", "name": a.nombre, "riskLevel": a.nivel_riesgo, "schedule": a.horario}
 
 @app.put("/api/v1/areas/{id_area}")
 def actualizar_area(id_area: int, data: AreaUpdate, db: Session = Depends(get_db)):

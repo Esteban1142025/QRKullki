@@ -48,7 +48,8 @@ const readAllowCustom = (agency) => {
 /* ── Componente ─────────────────────────────────────────────────────────────── */
 const RestrictedAreas = () => {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin        = user?.role === 'admin';
+  const canManageAreas = ['admin', 'seguridad_fisica', 'tecnico_ti'].includes(user?.role);
   const agency  = user?.agency;
 
   const [areas, setAreas]         = useState([]);
@@ -78,6 +79,12 @@ const RestrictedAreas = () => {
   const [newSched, setNewSched]       = useState({ label: '', value: '' });
   const [showAddSched, setShowAddSched] = useState(false);
 
+  // Estado para crear nueva área
+  const [showCreate, setShowCreate]   = useState(false);
+  const [createForm, setCreateForm]   = useState({ nombre: '', riskLevel: 'Bajo', schedule: '', scheduleMode: 'preset' });
+  const [agencias, setAgencias]       = useState([]);
+  const [createAgencyId, setCreateAgencyId] = useState(null);
+
   const fetchAreas = useCallback(async () => {
     setLoading(true);
     try {
@@ -91,6 +98,44 @@ const RestrictedAreas = () => {
   }, []);
 
   useEffect(() => { fetchAreas(); }, [fetchAreas]);
+
+  // Cargar agencias cuando se abre el modal de creación
+  useEffect(() => {
+    if (!showCreate) return;
+    apiClient.get('/agencias').then(res => {
+      setAgencias(res.data);
+      if (agency) {
+        const match = res.data.find(ag => ag.id === agency);
+        if (match) setCreateAgencyId(match.id_agencia);
+      }
+    }).catch(console.error);
+  }, [showCreate, agency]);
+
+  /* ── Crear nueva área ── */
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    if (!createForm.nombre.trim()) {
+      Swal.fire({ icon: 'warning', title: 'Campo requerido', text: 'El nombre del área es obligatorio.', background: '#ffffff', color: '#1e293b' }); return;
+    }
+    if (!createForm.schedule) {
+      Swal.fire({ icon: 'warning', title: 'Campo requerido', text: 'Debes seleccionar un horario.', background: '#ffffff', color: '#1e293b' }); return;
+    }
+    try {
+      await apiClient.post('/areas', {
+        nombre: createForm.nombre.trim(),
+        nivel_riesgo: createForm.riskLevel,
+        horario: createForm.schedule,
+        id_agencia: createAgencyId || null,
+      });
+      await fetchAreas();
+      setShowCreate(false);
+      setCreateForm({ nombre: '', riskLevel: 'Bajo', schedule: '', scheduleMode: 'preset' });
+      setCreateAgencyId(null);
+      Swal.fire({ icon: 'success', title: 'Área Creada', timer: 1500, showConfirmButton: false, background: '#ffffff', color: '#1e293b' });
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.response?.data?.detail || 'Error al crear el área.', background: '#ffffff', color: '#1e293b' });
+    }
+  };
 
   /* ── Abrir modal ── */
   const handleEdit = (area) => {
@@ -219,6 +264,13 @@ const RestrictedAreas = () => {
         </div>
         <div className="flex gap-2">
           <button onClick={fetchAreas} className="btn-icon" title="Actualizar"><MdRefresh size={18} /></button>
+          {canManageAreas && (
+            <button
+              onClick={() => { setCreateForm({ nombre: '', riskLevel: 'Bajo', schedule: '', scheduleMode: 'preset' }); setCreateAgencyId(null); setShowCreate(true); }}
+              className="flex items-center gap-2 px-5 py-3 bg-[#84cc16] hover:bg-[#65a30d] rounded-xl text-sm font-bold text-white tracking-wider transition-all shadow-lg shrink-0">
+              <MdAdd size={18} /> NUEVA ÁREA
+            </button>
+          )}
           <button onClick={() => setShowHistory(true)} className="flex items-center gap-2 px-5 py-3 bg-slate-800 hover:bg-slate-900 rounded-xl text-sm font-bold text-white tracking-wider transition-all shadow-lg shrink-0">
             <MdHistory size={18} className="text-[#84cc16]" /> HISTORIAL
           </button>
@@ -265,6 +317,112 @@ const RestrictedAreas = () => {
           </div>
         ))}
       </div>
+
+      {/* ── MODAL DE CREACIÓN ────────────────────────────────────────────────── */}
+      {showCreate && canManageAreas && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between shrink-0">
+              <h3 className="text-sm font-black text-slate-800 font-['Outfit'] uppercase tracking-wider flex items-center gap-2">
+                <MdAdd size={18} className="text-[#84cc16]" /> Nueva Área Restringida
+              </h3>
+              <button onClick={() => setShowCreate(false)} className="text-slate-400 hover:text-slate-600"><MdClose size={20} /></button>
+            </div>
+
+            <div className="overflow-y-auto flex-1">
+              <form onSubmit={handleCreate} id="create-area-form" className="p-6 space-y-5">
+
+                {/* Nombre */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Nombre del Área <span className="text-red-400">*</span></label>
+                  <input type="text" value={createForm.nombre}
+                    onChange={e => setCreateForm({ ...createForm, nombre: e.target.value })}
+                    placeholder="Ej: Bóveda Principal, Sala de Servidores..."
+                    required
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#84cc16]/30 focus:border-[#84cc16]" />
+                </div>
+
+                {/* Nivel de riesgo */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Nivel de Riesgo</label>
+                  <select value={createForm.riskLevel}
+                    onChange={e => setCreateForm({ ...createForm, riskLevel: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-800">
+                    <option>Bajo</option><option>Medio</option><option>Alto</option><option>Crítico</option>
+                  </select>
+                </div>
+
+                {/* Agencia */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Agencia</label>
+                  <select value={createAgencyId ?? ''}
+                    onChange={e => setCreateAgencyId(e.target.value ? Number(e.target.value) : null)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-800">
+                    <option value="">Sin agencia asignada</option>
+                    {agencias.map(ag => (
+                      <option key={ag.id_agencia} value={ag.id_agencia}>
+                        {ag.name}{ag.id && ag.id !== `AG-${ag.id_agencia}` ? ` (${ag.id})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Horario */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Horario Permitido <span className="text-red-400">*</span></label>
+                  <div className="space-y-1.5">
+                    {schedules.filter(s => s.active).map(s => (
+                      <div key={s.id} className="rounded-xl border bg-white border-slate-200 cursor-pointer"
+                        onClick={() => setCreateForm({ ...createForm, scheduleMode: 'preset', schedule: s.value })}>
+                        <div className="flex items-center gap-2 px-3 py-2">
+                          <input type="radio" name="createSchedule" readOnly
+                            checked={createForm.scheduleMode === 'preset' && createForm.schedule === s.value}
+                            className="accent-[#84cc16] shrink-0 pointer-events-none" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-slate-700 truncate">{s.label}</p>
+                            <p className="text-[10px] font-mono text-slate-500">{s.value}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {allowCustom && (
+                      <div className="rounded-xl border bg-white border-slate-200">
+                        <div className="flex items-center gap-2 px-3 py-2 cursor-pointer"
+                          onClick={() => setCreateForm({ ...createForm, scheduleMode: 'custom', schedule: '' })}>
+                          <input type="radio" name="createSchedule" readOnly
+                            checked={createForm.scheduleMode === 'custom'}
+                            className="accent-[#84cc16] shrink-0 pointer-events-none" />
+                          <div className="flex-1 flex items-center gap-1.5">
+                            <MdTune size={13} className="text-[#65a30d]" />
+                            <span className="text-xs font-bold text-slate-700">Horario Personalizado</span>
+                          </div>
+                        </div>
+                        {createForm.scheduleMode === 'custom' && (
+                          <div className="px-3 pb-3">
+                            <input autoFocus type="text" value={createForm.schedule}
+                              onChange={e => setCreateForm({ ...createForm, schedule: e.target.value.replace(/[^0-9:\-/, ]/g, '') })}
+                              placeholder="Ej: 09:00 - 13:00, 14:00 - 17:00"
+                              className="w-full border border-[#84cc16] rounded-lg px-3 py-2 text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#84cc16]/30" />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </form>
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 shrink-0 flex justify-end">
+              <button type="submit" form="create-area-form"
+                className="flex items-center gap-2 px-5 py-2.5 bg-[#84cc16] hover:bg-[#65a30d] rounded-xl text-sm font-bold text-white shadow-md transition-all">
+                <MdSave size={18} /> Crear Área
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── MODAL DE EDICIÓN ────────────────────────────────────────────────── */}
       {editingArea && (
