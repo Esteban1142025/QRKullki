@@ -52,6 +52,8 @@ const Employees = () => {
   const [search, setSearch]           = useState('');
   const [filterDept, setFilterDept]   = useState('ALL');
   const [filterStatus, setFilterStatus] = useState('ALL');
+  const [page, setPage]               = useState(1);
+  const PAGE_SIZE = 10;
   const [showForm, setShowForm]       = useState(false);
   const [showQR, setShowQR]           = useState(false);
   const [editing, setEditing]         = useState(null);
@@ -256,6 +258,10 @@ const Employees = () => {
       && (filterStatus === 'ALL' || e.status === filterStatus);
   });
 
+  const totalPages  = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage    = Math.min(page, totalPages);
+  const paginated   = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
   const openAdd = () => {
     setForm({ ...BLANK_FORM, hireDate: new Date().toISOString().split('T')[0] });
     setEditing(null);
@@ -432,18 +438,18 @@ const Employees = () => {
       <div className="card-corporate p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
         <div className="lg:col-span-2 space-y-1">
           <label className="form-label">Buscar</label>
-          <input type="text" placeholder="Nombre, cédula o ID..." value={search} onChange={e => setSearch(e.target.value)} className="w-full" />
+          <input type="text" placeholder="Nombre, cédula o ID..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} className="w-full" />
         </div>
         <div className="space-y-1">
           <label className="form-label">Departamento</label>
-          <select value={filterDept} onChange={e => setFilterDept(e.target.value)} className="w-full">
+          <select value={filterDept} onChange={e => { setFilterDept(e.target.value); setPage(1); }} className="w-full">
             <option value="ALL">Todos</option>
             {departments.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
         </div>
         <div className="space-y-1">
           <label className="form-label">Estado</label>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="w-full">
+          <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setPage(1); }} className="w-full">
             <option value="ALL">Todos</option>
             <option value="Activo">Activo</option>
             <option value="Inactivo">Inactivo</option>
@@ -462,7 +468,7 @@ const Employees = () => {
               </tr>
             </thead>
             <tbody>
-              {filtered.length > 0 ? filtered.map(emp => {
+              {paginated.length > 0 ? paginated.map(emp => {
                 const role = ROLES[emp.role] ?? { name: emp.role, badgeColor: 'bg-slate-100 text-slate-500 border-slate-200' };
                 return (
                   <tr key={emp.id}>
@@ -522,8 +528,43 @@ const Employees = () => {
             </tbody>
           </table>
         </div>
-        <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-[10px] text-slate-500">
-          <span>Cooperativa Kullki Wasi — Segmento 1</span>
+        <div className="px-4 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-4 flex-wrap">
+          <span className="text-[11px] text-slate-500">
+            Mostrando <strong className="text-slate-700">{filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)}</strong> de <strong className="text-slate-700">{filtered.length}</strong> colaboradores
+          </span>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={safePage === 1}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+              >← Anterior</button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(n => n === 1 || n === totalPages || Math.abs(n - safePage) <= 1)
+                .reduce((acc, n, idx, arr) => {
+                  if (idx > 0 && n - arr[idx - 1] > 1) acc.push('…');
+                  acc.push(n);
+                  return acc;
+                }, [])
+                .map((n, i) =>
+                  n === '…'
+                    ? <span key={`ellipsis-${i}`} className="px-2 text-xs text-slate-400">…</span>
+                    : <button
+                        key={n}
+                        onClick={() => setPage(n)}
+                        className={`w-8 h-8 rounded-lg text-xs font-bold transition-all cursor-pointer ${safePage === n ? 'bg-[#84cc16] text-white shadow-sm' : 'border border-slate-200 text-slate-600 hover:bg-white'}`}
+                      >{n}</button>
+                )
+              }
+
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={safePage === totalPages}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+              >Siguiente →</button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -544,7 +585,6 @@ const Employees = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
                   ['Cédula de Identidad', 'dni', 'text', '1804293840'],
-                  ['Nombre Completo', 'name', 'text', 'Ej: Luis Morales Quispe'],
                   ['Correo Institucional', 'email', 'email', 'lmorales@kullkiwasi.com.ec'],
                   ['Teléfono', 'phone', 'text', '0987654321'],
                 ].map(([label, key, type, ph]) => (
@@ -553,6 +593,16 @@ const Employees = () => {
                     <input type={type} placeholder={ph} value={form[key]} onChange={e => field(key, e.target.value)} className="form-input" />
                   </div>
                 ))}
+                <div className="space-y-1">
+                  <label className="form-label">Nombre Completo</label>
+                  <input
+                    type="text"
+                    placeholder="Ej: Luis Morales Quispe"
+                    value={form.name}
+                    onChange={e => field('name', e.target.value.replace(/[^a-záéíóúüñA-ZÁÉÍÓÚÜÑ\s]/g, ''))}
+                    className="form-input"
+                  />
+                </div>
                 <div className="space-y-1">
                   <label className="form-label">Rol de Sistema</label>
                   <select value={form.role} onChange={e => field('role', e.target.value)} className="form-input">
