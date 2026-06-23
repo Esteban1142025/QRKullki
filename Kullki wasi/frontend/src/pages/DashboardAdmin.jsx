@@ -182,13 +182,6 @@ const DashboardAdmin = () => {
               <strong className="text-[#79ac34]">{user?.agencyDisplayName || user?.agencyName || (user?.agency === 'MAT' ? 'Matriz Ambato' : user?.agency)}</strong>.
             </p>
           </div>
-          <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-slate-200 shrink-0 shadow-sm">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#8DC63F] opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#8DC63F]" />
-            </span>
-            <span className="text-xs font-bold text-[#8DC63F] uppercase tracking-wide">Sistemas en Línea</span>
-          </div>
         </div>
       </div>
 

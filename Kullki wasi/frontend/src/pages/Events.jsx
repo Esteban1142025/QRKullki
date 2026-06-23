@@ -232,7 +232,6 @@ const Events = () => {
           </table>
         </div>
         <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-[10px] text-slate-500">
-          <span>Mostrando {filtered.length} de {events.length} eventos</span>
           <span>Agencia: {agency} — Auditoría RBAC</span>
         </div>
       </div>

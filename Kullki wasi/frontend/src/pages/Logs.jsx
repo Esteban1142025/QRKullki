@@ -17,34 +17,27 @@ const STATUS_COLORS = {
 
 const Logs = () => {
   const { user } = useAuth();
-  const [logs, setLogs]             = useState([]);
-  const [agencies, setAgencies]     = useState([]);
-  const [areas, setAreas]           = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [search, setSearch]         = useState('');
-  const [filterAgency, setAgency]   = useState('ALL');
-  const [filterArea, setArea]       = useState('ALL');
-  const [filterStatus, setStatus]   = useState('ALL');
-  const [filterRisk, setRisk]       = useState('ALL');
+  const [logs, setLogs]           = useState([]);
+  const [areas, setAreas]         = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [search, setSearch]       = useState('');
+  const [filterArea, setArea]     = useState('ALL');
+  const [filterStatus, setStatus] = useState('ALL');
+  const [filterRisk, setRisk]     = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Resetear filtro manual cuando cambia la agencia global
-  useEffect(() => {
-    setAgency('ALL');
-    setCurrentPage(1);
-  }, [user?.agency]);
+  // Resetear página al cambiar agencia global
+  useEffect(() => { setCurrentPage(1); }, [user?.agency]);
 
   const loadLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const [logsRes, agRes, areaRes] = await Promise.all([
+      const [logsRes, areaRes] = await Promise.all([
         apiClient.get('/audit-logs'),
-        apiClient.get('/agencias'),
         apiClient.get('/areas'),
       ]);
       setLogs(logsRes.data);
-      setAgencies(agRes.data);
       setAreas(areaRes.data);
     } catch (err) {
       console.error('Error al cargar bitácora:', err);
@@ -55,46 +48,41 @@ const Logs = () => {
 
   useEffect(() => { loadLogs(); }, [loadLogs]);
 
-  // Todas las áreas del sistema (desde la DB, no solo las que aparecen en logs)
   const allAreas = areas.map(a => a.name).sort();
 
-  // Derivar agencia efectiva directamente de user.agency para reactividad garantizada
-  const effectiveAgency = filterAgency !== 'ALL' ? filterAgency : (user?.agency || 'ALL');
+  // Siempre filtrar por la agencia activa del usuario
+  const effectiveAgency = user?.agency || 'ALL';
 
-  // Logs sólo de la agencia activa (para KPIs)
+  // KPIs: logs de la agencia activa
   const agencyLogs = logs.filter(l => effectiveAgency === 'ALL' || l.agency === effectiveAgency);
 
-  const filtered = logs.filter(l => {
+  const filtered = agencyLogs.filter(l => {
     const q = search.toLowerCase();
-    const matchQ = (l.name     || '').toLowerCase().includes(q) ||
+    const matchQ = (l.name       || '').toLowerCase().includes(q) ||
                    (l.employeeId || '').toLowerCase().includes(q) ||
-                   (l.id       || '').toLowerCase().includes(q) ||
-                   (l.area     || '').toLowerCase().includes(q);
+                   (l.id         || '').toLowerCase().includes(q) ||
+                   (l.area       || '').toLowerCase().includes(q);
     return matchQ
-      && (effectiveAgency === 'ALL' || l.agency === effectiveAgency)
       && (filterArea   === 'ALL' || l.area   === filterArea)
       && (filterStatus === 'ALL' || l.status === filterStatus)
       && (filterRisk   === 'ALL' || l.risk   === filterRisk);
   });
 
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const totalPages  = Math.ceil(filtered.length / itemsPerPage);
   const currentLogs = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  useEffect(() => { setCurrentPage(1); }, [search, filterAgency, filterArea, filterStatus, filterRisk]);
+  useEffect(() => { setCurrentPage(1); }, [search, filterArea, filterStatus, filterRisk]);
 
   const handlePrintPDF = () => {
     const now = new Date().toLocaleString('es-EC');
-    // Agencia activa: si el usuario seleccionó una manualmente usa esa, si no usa la del contexto
-    const activeAgencyName = filterAgency !== 'ALL'
-      ? agencies.find(a => a.id === filterAgency)?.name || filterAgency
-      : agencies.find(a => a.id === user?.agency)?.name || user?.agency || null;
+    const agencyName = user?.agencyName || user?.agency || '—';
     const activeFilters = [
-      activeAgencyName && `Agencia: ${activeAgencyName}`,
+      `Agencia: ${agencyName}`,
       filterArea   !== 'ALL' && `Área: ${filterArea}`,
       filterStatus !== 'ALL' && `Estado: ${filterStatus}`,
       filterRisk   !== 'ALL' && `Riesgo: ${filterRisk}`,
       search && `Búsqueda: "${search}"`,
-    ].filter(Boolean).join(' | ') || 'Sin filtros aplicados';
+    ].filter(Boolean).join(' | ');
 
     const rows = filtered.map(l => {
       const fecha = l.timestamp ? new Date(l.timestamp).toLocaleDateString('es-EC') : '—';
@@ -107,7 +95,6 @@ const Logs = () => {
           <td>${fecha}<br><span style="font-size:9px;color:#94a3b8">${hora}</span></td>
           <td><strong>${l.name || 'Desconocido'}</strong><br><span style="font-size:9px;color:#94a3b8;font-family:monospace">${l.employeeId || 'N/A'}</span></td>
           <td>${l.area || '—'}<br><span style="font-size:9px;color:#94a3b8">${l.device || '—'}</span></td>
-          <td style="text-align:center">${l.agency || '—'}</td>
           <td style="text-align:center"><span style="color:${statusColor};font-weight:700;font-size:10px">${(l.status || '—').toUpperCase()}</span></td>
           <td style="text-align:center"><span style="color:${riskColor};font-weight:700;font-size:10px">${l.risk || '—'}</span></td>
         </tr>`;
@@ -124,7 +111,6 @@ const Logs = () => {
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #1e293b; background:#fff; }
     .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid #e2e8f0; }
-    .brand { display:flex; align-items:center; gap:10px; }
     .brand-text .name { font-size:16px; font-weight:900; color:#1e293b; letter-spacing:.05em; }
     .brand-text .sub  { font-size:9px;  color:#8DC63F; text-transform:uppercase; font-weight:700; letter-spacing:.1em; }
     .meta { text-align:right; font-size:9px; color:#94a3b8; line-height:1.6; }
@@ -139,23 +125,20 @@ const Logs = () => {
     thead tr { background:#1e293b; color:#fff; }
     thead th { padding:8px 10px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; text-align:left; white-space:nowrap; }
     tbody tr:nth-child(even) { background:#f8fafc; }
-    tbody tr:hover { background:#f1f5f9; }
     tbody td { padding:7px 10px; font-size:10px; border-bottom:1px solid #e2e8f0; vertical-align:middle; }
     .footer { margin-top:16px; padding-top:10px; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; font-size:8px; color:#94a3b8; }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="brand">
-      <div class="brand-text">
-        <div class="name">KULLKI WASI</div>
-        <div class="sub">Cooperativa de Ahorro y Crédito</div>
-      </div>
+    <div class="brand-text">
+      <div class="name">KULLKI WASI</div>
+      <div class="sub">Cooperativa de Ahorro y Crédito</div>
     </div>
     <div class="meta">
       <strong>Bitácora Institucional de Accesos</strong><br>
       Generado: ${now}<br>
-      Registros mostrados: ${filtered.length} de ${logs.length}
+      Registros mostrados: ${filtered.length} de ${agencyLogs.length}
     </div>
   </div>
 
@@ -172,10 +155,10 @@ const Logs = () => {
     <thead>
       <tr>
         <th>ID</th><th>Fecha / Hora</th><th>Colaborador</th>
-        <th>Área / Dispositivo</th><th>Agencia</th><th>Estado</th><th>Riesgo</th>
+        <th>Área / Dispositivo</th><th>Estado</th><th>Riesgo</th>
       </tr>
     </thead>
-    <tbody>${rows || '<tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8">Sin registros</td></tr>'}</tbody>
+    <tbody>${rows || '<tr><td colspan="6" style="text-align:center;padding:20px;color:#94a3b8">Sin registros</td></tr>'}</tbody>
   </table>
 
   <div class="footer">
@@ -201,7 +184,6 @@ const Logs = () => {
       didOpen: () => {
         Swal.showLoading();
         setTimeout(() => {
-          // Convierte timestamp UTC (ISO con Z) a fecha/hora local del navegador
           const fmtLocal = (ts) => {
             if (!ts) return '';
             try {
@@ -212,10 +194,10 @@ const Logs = () => {
               });
             } catch { return ts; }
           };
-          const headers = ['ID Bitácora','Fecha y Hora (Local)','ID Colaborador','Nombre','Cargo','Agencia','Área','Dispositivo','Estado','Detalle','Riesgo'];
+          const headers = ['ID Bitácora','Fecha y Hora (Local)','ID Colaborador','Nombre','Cargo','Área','Dispositivo','Estado','Detalle','Riesgo'];
           const rows = filtered.map(l => [
             l.id, fmtLocal(l.timestamp), l.employeeId, l.name, l.role,
-            l.agency, l.area, l.device, l.status, l.details, l.risk,
+            l.area, l.device, l.status, l.details, l.risk,
           ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','));
           const csv = '﻿' + [headers.join(','), ...rows].join('\n');
           const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
@@ -269,7 +251,7 @@ const Logs = () => {
         ))}
       </div>
 
-      <div className="card-corporate p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+      <div className="card-corporate p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
         <div className="space-y-1">
           <label className="form-label flex items-center gap-1">
             <MdSearch size={14} /> Buscar
@@ -281,13 +263,6 @@ const Logs = () => {
             onChange={e => setSearch(e.target.value)}
             className="w-full"
           />
-        </div>
-        <div className="space-y-1">
-          <label className="form-label">Agencia</label>
-          <select value={filterAgency} onChange={e => setAgency(e.target.value)} className="w-full">
-            <option value="ALL">Todas las Agencias</option>
-            {agencies.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
         </div>
         <div className="space-y-1">
           <label className="form-label">Área</label>
@@ -322,7 +297,7 @@ const Logs = () => {
           <table className="w-full text-left text-xs data-table">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                {['ID', 'Fecha / Hora', 'Colaborador', 'Área / Dispositivo', 'Agencia', 'Estado', 'Riesgo'].map(h => (
+                {['ID', 'Fecha / Hora', 'Colaborador', 'Área / Dispositivo', 'Estado', 'Riesgo'].map(h => (
                   <th key={h} className="px-4 py-3.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -330,7 +305,7 @@ const Logs = () => {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={6} className="px-4 py-12 text-center text-slate-500">
                     <div className="w-8 h-8 border-4 border-[#8DC63F] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                     Cargando bitácora...
                   </td>
@@ -350,7 +325,6 @@ const Logs = () => {
                     <p className="text-slate-800 truncate">{log.area}</p>
                     <p className="text-[10px] text-slate-500 truncate">{log.device}</p>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{log.agency}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className={`badge ${STATUS_COLORS[log.status] ?? ''}`}>{log.status}</span>
                   </td>
@@ -360,7 +334,7 @@ const Logs = () => {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={6} className="px-4 py-12 text-center text-slate-500">
                     <p className="font-medium">No hay registros de trazabilidad disponibles.</p>
                     <p className="text-xs mt-1">Los accesos QR escaneados aparecerán aquí automáticamente.</p>
                   </td>
@@ -370,7 +344,6 @@ const Logs = () => {
           </table>
         </div>
         <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3 text-[10px] text-slate-500">
-          <span>Mostrando <strong className="text-slate-700">{currentLogs.length}</strong> de <strong className="text-slate-700">{filtered.length}</strong> registros</span>
           <div className="flex items-center gap-1">
             <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="btn-icon disabled:opacity-50">
               <MdChevronLeft size={16} />

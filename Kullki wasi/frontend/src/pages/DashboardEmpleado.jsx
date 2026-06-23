@@ -38,10 +38,6 @@ const DashboardEmpleado = () => {
               <strong className="text-[#79ac34]">{user?.agencyDisplayName || user?.agencyName || user?.agency}</strong>.
             </p>
           </div>
-          <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-slate-200 shrink-0 shadow-sm">
-            <MdCheckCircle className="text-[#8DC63F]" size={16} />
-            <span className="text-xs font-bold text-[#8DC63F] uppercase tracking-wide">Credencial Activa</span>
-          </div>
         </div>
       </div>
 

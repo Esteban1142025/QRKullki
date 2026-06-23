@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../services/api/apiClient';
-import { agencyKey } from '../utils/agencyStorage';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   MdDashboard,
@@ -18,7 +17,6 @@ import {
   MdPowerSettingsNew,
   MdMenu,
   MdChevronLeft,
-  MdNotifications,
   MdWatchLater,
   MdLayers,
   MdSwapHoriz,
@@ -54,10 +52,8 @@ const DashboardLayout = () => {
   const [mobileOpen, setMobileOpen]               = useState(false);
   const [currentTime, setCurrentTime]             = useState(new Date());
   const [showRoleSwitcher, setShowRoleSwitcher]   = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showAgencySwitcher, setShowAgencySwitcher] = useState(false);
   const [activeAgencies, setActiveAgencies]       = useState([]);
-  const [notifications, setNotifications]         = useState([]);
 
   // Reloj institucional en tiempo real
   useEffect(() => {
@@ -73,35 +69,6 @@ const DashboardLayout = () => {
   };
   useEffect(() => { fetchAgencies(); }, []);
   useEffect(() => { if (showAgencySwitcher) fetchAgencies(); }, [showAgencySwitcher]);
-
-  // Cargar notificaciones dinámicas — aisladas por agencia
-  useEffect(() => {
-    const loadNotifications = () => {
-      try {
-        const alerts = JSON.parse(localStorage.getItem(agencyKey('kw_dynamic_alerts', user?.agency)) || '[]');
-        const unread = alerts.filter(a => !a.isResolved).map(a => ({
-          id: a.id,
-          text: a.details || a.type,
-          time: new Date(a.timestamp).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' }),
-          type: a.severity === 'Crítica' ? 'error' : 'warning'
-        }));
-        setNotifications(unread);
-      } catch (e) {}
-    };
-    loadNotifications();
-    const interval = setInterval(loadNotifications, 5000);
-    return () => clearInterval(interval);
-  }, [user?.agency]);
-
-  const markAsRead = (id) => {
-    try {
-      const key = agencyKey('kw_dynamic_alerts', user?.agency);
-      const alerts = JSON.parse(localStorage.getItem(key) || '[]');
-      const updated = alerts.map(a => a.id === id ? { ...a, isResolved: true, resolvedBy: user?.name, status: 'Resuelto' } : a);
-      localStorage.setItem(key, JSON.stringify(updated));
-      setNotifications(notifications.filter(n => n.id !== id));
-    } catch (e) {}
-  };
 
   const handleLogout = () => {
     logout();
@@ -121,7 +88,6 @@ const DashboardLayout = () => {
   // Cerrar dropdowns al navegar
   useEffect(() => {
     setMobileOpen(false);
-    setShowNotifications(false);
     setShowRoleSwitcher(false);
     setShowAgencySwitcher(false);
   }, [location.pathname]);
@@ -285,7 +251,7 @@ const DashboardLayout = () => {
             <div className="relative hidden lg:block">
               {canSwitchAgency ? (
               <button
-                onClick={() => { setShowAgencySwitcher(v => !v); setShowNotifications(false); setShowRoleSwitcher(false); }}
+                onClick={() => { setShowAgencySwitcher(v => !v); setShowRoleSwitcher(false); }}
                 className="text-right leading-tight px-3 py-2 rounded-xl hover:bg-slate-100 border border-transparent hover:border-slate-200 transition-all group cursor-pointer"
                 title="Cambiar agencia"
               >
@@ -353,65 +319,6 @@ const DashboardLayout = () => {
                         </div>
                       )}
                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* Notificaciones */}
-            <div className="relative">
-              <button
-                onClick={() => { setShowNotifications(v => !v); setShowRoleSwitcher(false); }}
-                className="relative p-2 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-[#8DC63F] hover:border-[#8DC63F]/50 transition-all shadow-sm"
-              >
-                <MdNotifications size={18} />
-                {notifications.length > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white" />
-                )}
-              </button>
-
-              <AnimatePresence>
-                {showNotifications && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden z-50"
-                  >
-                    <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                      <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Centro de Eventos</span>
-                      <div className="flex items-center gap-2">
-                        {notifications.length > 0 && (
-                          <button onClick={() => setNotifications([])} className="text-[10px] text-slate-400 hover:text-red-500 font-bold transition-colors">
-                            Limpiar
-                          </button>
-                        )}
-                        <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600">
-                          <MdClose size={14} />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="max-h-60 overflow-y-auto">
-                      {notifications.length > 0 ? notifications.map(n => (
-                        <div key={n.id} className="px-4 py-3 border-b border-slate-50 hover:bg-slate-50 transition-colors flex justify-between items-start gap-2">
-                          <div>
-                            <p className="text-xs text-slate-700 font-bold leading-snug">{n.text}</p>
-                            <p className="text-[10px] text-slate-400 mt-1 font-medium">{n.time}</p>
-                          </div>
-                          <button onClick={() => markAsRead(n.id)} className="text-[10px] text-emerald-600 hover:text-emerald-800 font-bold bg-emerald-50 px-2 py-1 rounded shrink-0">
-                            Leído
-                          </button>
-                        </div>
-                      )) : (
-                        <div className="p-5 text-center text-xs text-slate-400 font-medium">Sin alertas recientes</div>
-                      )}
-                    </div>
-                    {['admin', 'riesgos', 'seguridad_fisica'].includes(user?.role) && (
-                      <Link to="/security" onClick={() => setShowNotifications(false)} className="block px-4 py-2.5 text-center text-[11px] font-black text-[#79ac34] hover:text-[#6aa832] bg-slate-50 transition-colors">
-                        Ver todas las alertas →
-                      </Link>
-                    )}
                   </motion.div>
                 )}
               </AnimatePresence>

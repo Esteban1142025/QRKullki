@@ -19,6 +19,15 @@ import {
   MdClose, MdSave, MdPrint, MdPeople, MdBadge, MdRefresh
 } from 'react-icons/md';
 
+// Convierte el detalle de error de FastAPI (string o array de objetos) a texto legible
+const parseApiError = (err) => {
+  const detail = err?.response?.data?.detail;
+  if (!detail) return null;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) return detail.map(d => d.msg || JSON.stringify(d)).join(' | ');
+  return JSON.stringify(detail);
+};
+
 const DEPARTMENTS = [
   'Tecnología e Información', 'Talento Humano', 'Gestión de Riesgos',
   'Seguridad y Vigilancia', 'Auditoría Interna', 'Operaciones Financieras',
@@ -38,15 +47,9 @@ const Employees = () => {
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [search, setSearch]         = useState('');
-  const [filterAgency, setFilterAgency] = useState('ALL');
+  const [search, setSearch]           = useState('');
   const [filterDept, setFilterDept]   = useState('ALL');
   const [filterStatus, setFilterStatus] = useState('ALL');
-
-  // Resetear filtro manual cuando el usuario cambia de agencia globalmente
-  useEffect(() => {
-    setFilterAgency('ALL');
-  }, [user?.agency]);
   const [showForm, setShowForm]       = useState(false);
   const [showQR, setShowQR]           = useState(false);
   const [editing, setEditing]         = useState(null);
@@ -188,10 +191,7 @@ const Employees = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // effectiveAgency se deriva DIRECTAMENTE de user.agency en cada render —
-  // garantiza reactividad inmediata al cambiar de agencia sin depender de sync de estado.
-  // filterAgency === 'ALL' significa "seguir el contexto global"; cualquier otro valor es override manual.
-  const effectiveAgency = filterAgency !== 'ALL' ? filterAgency : (user?.agency || 'ALL');
+  const effectiveAgency = user?.agency || 'ALL';
 
   // Empleados sólo de la agencia activa (para KPIs)
   const agencyEmployees = employees.filter(e => effectiveAgency === 'ALL' || e.agency === effectiveAgency);
@@ -249,7 +249,7 @@ const Employees = () => {
           await fetchData();
           fireSwal({ icon: 'success', title: 'Registro eliminado', timer: 1400, showConfirmButton: false });
         } catch (err) {
-          fireSwal({ icon: 'error', title: 'Error', text: err.response?.data?.detail || 'No se pudo eliminar el colaborador.' });
+          fireSwal({ icon: 'error', title: 'Error', text: parseApiError(err) || 'No se pudo eliminar el colaborador.' });
         }
       }
     });
@@ -322,7 +322,7 @@ const Employees = () => {
         timer: 1600, showConfirmButton: false
       });
     } catch (err) {
-      fireSwal({ icon: 'error', title: 'Error', text: err.response?.data?.detail || 'Error al guardar el expediente.' });
+      fireSwal({ icon: 'error', title: 'Error', text: parseApiError(err) || 'Error al guardar el expediente.' });
     }
   };
 
@@ -382,17 +382,10 @@ const Employees = () => {
         ))}
       </div>
 
-      <div className="card-corporate p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+      <div className="card-corporate p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
         <div className="lg:col-span-2 space-y-1">
           <label className="form-label">Buscar</label>
           <input type="text" placeholder="Nombre, cédula o ID..." value={search} onChange={e => setSearch(e.target.value)} className="w-full" />
-        </div>
-        <div className="space-y-1">
-          <label className="form-label">Agencia</label>
-          <select value={filterAgency} onChange={e => setFilterAgency(e.target.value)} className="w-full">
-            <option value="ALL">Todas</option>
-            {agencies.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
         </div>
         <div className="space-y-1">
           <label className="form-label">Departamento</label>
@@ -483,7 +476,6 @@ const Employees = () => {
           </table>
         </div>
         <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-[10px] text-slate-500">
-          <span>Mostrando {filtered.length} de {employees.length} registros</span>
           <span>Cooperativa Kullki Wasi — Segmento 1</span>
         </div>
       </div>

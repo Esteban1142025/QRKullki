@@ -188,9 +188,6 @@ const Login = () => {
                 <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   Contraseña
                 </label>
-                <button type="button" className="text-[11px] font-bold text-[#15803d] hover:text-[#166534] transition-colors">
-                  ¿Olvidó su clave?
-                </button>
               </div>
               <div className="flex items-center bg-white border border-slate-300 rounded-xl focus-within:border-[#15803d] focus-within:ring-2 focus-within:ring-[#15803d]/20 transition-all overflow-hidden shadow-sm">
                 <div className="pl-4 pr-2 text-slate-400 flex items-center justify-center">
