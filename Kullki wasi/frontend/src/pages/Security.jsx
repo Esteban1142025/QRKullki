@@ -7,6 +7,30 @@ import {
   MdFilterList
 } from 'react-icons/md';
 
+const SEVERITY_STYLES = {
+  Crítica: {
+    border: 'border-l-red-500 border-y-red-100 border-r-red-100',
+    glow:   'bg-red-100/50',
+    badge:  'bg-red-50 text-red-600 border-red-200',
+  },
+  Alta: {
+    border: 'border-l-orange-500 border-y-orange-100 border-r-orange-100',
+    glow:   'bg-orange-100/50',
+    badge:  'bg-orange-50 text-orange-600 border-orange-200',
+  },
+  Media: {
+    border: 'border-l-yellow-500 border-y-yellow-100 border-r-yellow-100',
+    glow:   'bg-yellow-100/50',
+    badge:  'bg-yellow-50 text-yellow-700 border-yellow-200',
+  },
+  Baja: {
+    border: 'border-l-blue-400 border-y-blue-50 border-r-blue-50',
+    glow:   'bg-blue-50/50',
+    badge:  'bg-blue-50 text-blue-600 border-blue-200',
+  },
+};
+const getSeverityStyle = (s) => SEVERITY_STYLES[s] || SEVERITY_STYLES.Alta;
+
 const Security = () => {
   const { user } = useAuth();
   const [alerts, setAlerts] = useState([]);
@@ -155,22 +179,14 @@ const Security = () => {
 
           <div className="space-y-4">
             {activeDisplay.length > 0 ? (
-              activeDisplay.map((alert) => (
-                <div key={alert.id} className={`p-6 rounded-2xl bg-white relative overflow-hidden transition-all shadow-md border-y border-r border-l-4 ${
-                  alert.severity === 'Crítica'
-                    ? 'border-l-red-500 border-y-red-100 border-r-red-100 hover:shadow-lg'
-                    : 'border-l-orange-500 border-y-orange-100 border-r-orange-100 hover:shadow-lg'
-                }`}>
-                  <div className={`absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl pointer-events-none ${
-                    alert.severity === 'Crítica' ? 'bg-red-100/50' : 'bg-orange-100/50'
-                  }`} />
+              activeDisplay.map((alert) => {
+                const sty = getSeverityStyle(alert.severity);
+                return (
+                <div key={alert.id} className={`p-6 rounded-2xl bg-white relative overflow-hidden transition-all shadow-md border-y border-r border-l-4 hover:shadow-lg ${sty.border}`}>
+                  <div className={`absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl pointer-events-none ${sty.glow}`} />
                   <div className="flex items-center justify-between mb-4 relative z-10">
                     <div className="flex items-center gap-3">
-                      <span className={`px-2.5 py-1 rounded text-xs font-bold uppercase border ${
-                        alert.severity === 'Crítica'
-                          ? 'bg-red-50 text-red-600 border-red-200'
-                          : 'bg-orange-50 text-orange-600 border-orange-200'
-                      }`}>
+                      <span className={`px-2.5 py-1 rounded text-xs font-bold uppercase border ${sty.badge}`}>
                         Gravedad {alert.severity}
                       </span>
                       <span className="text-xs font-mono font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded border border-slate-200">
@@ -186,7 +202,7 @@ const Security = () => {
                   </div>
                   <div className="space-y-2 relative z-10 mb-5">
                     <h4 className="font-black text-lg text-slate-800 flex items-center gap-2">
-                      <MdWarning size={22} className={alert.severity === 'Crítica' ? 'text-red-500' : 'text-orange-500'} />
+                      <MdWarning size={22} className={sty.badge.includes('red') ? 'text-red-500' : sty.badge.includes('orange') ? 'text-orange-500' : sty.badge.includes('yellow') ? 'text-yellow-600' : 'text-blue-500'} />
                       {alert.type}
                     </h4>
                     <p className="text-sm text-slate-600 leading-relaxed font-medium">{alert.details}</p>
@@ -201,7 +217,8 @@ const Security = () => {
                     </button>
                   </div>
                 </div>
-              ))
+              );
+              })
             ) : (
               <div className="p-10 text-center rounded-2xl bg-white border border-slate-200 shadow-sm text-slate-500 text-sm flex flex-col items-center gap-4">
                 <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500">

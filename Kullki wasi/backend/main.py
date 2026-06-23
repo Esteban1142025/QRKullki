@@ -891,8 +891,8 @@ def get_audit_dashboard(agency: Optional[str] = Query(None), db: Session = Depen
     def log_q(extra_filters=None):
         q = db.query(func.count(models.BitacoraAcceso.id_bitacora))
         if ag_id:
-            q = q.outerjoin(models.Empleado, models.BitacoraAcceso.id_empleado == models.Empleado.id_empleado)\
-                 .filter(models.Empleado.id_agencia_base == ag_id)
+            q = q.outerjoin(models.AreaRestringida, models.BitacoraAcceso.id_area == models.AreaRestringida.id_area)\
+                 .filter(models.AreaRestringida.id_agencia == ag_id)
         if extra_filters:
             q = q.filter(*extra_filters)
         return q.scalar() or 0
@@ -1061,7 +1061,9 @@ def listar_alertas(agency: Optional[str] = Query(None), db: Session = Depends(ge
         if a.bitacora and a.bitacora.area and a.bitacora.area.agencia:
             ag_obj = a.bitacora.area.agencia
         agencia_codigo = (ag_obj.codigo or ag_obj.nombre) if ag_obj else None
-        severity = "Crítica" if "Denegado" in a.tipo_alerta or "Intrusión" in a.tipo_alerta else "Alta"
+        _risk_to_severity = {"Bajo": "Baja", "Medio": "Media", "Alto": "Alta", "Crítico": "Crítica"}
+        area_risk = a.bitacora.area.nivel_riesgo if (a.bitacora and a.bitacora.area) else None
+        severity = _risk_to_severity.get(area_risk, "Alta")
         result.append({
             "id": f"ALT-{a.id_alerta}",
             "id_alerta": a.id_alerta,
