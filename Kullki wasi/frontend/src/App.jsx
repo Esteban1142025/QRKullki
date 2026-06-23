@@ -83,19 +83,19 @@ function App() {
             } />
 
             <Route path="logs" element={
-              <ProtectedRoute allowedRoles={['admin', 'riesgos', 'auditor', 'tecnico_ti']} allowedPermission="ver_reportes">
+              <ProtectedRoute allowedRoles={['admin', 'riesgos', 'auditor', 'tecnico_ti', 'seguridad_fisica']} allowedPermission="ver_reportes">
                 <Logs />
               </ProtectedRoute>
             } />
 
             <Route path="audit" element={
-              <ProtectedRoute allowedRoles={['admin', 'auditor']} allowedPermission="modulo_auditoria">
+              <ProtectedRoute allowedRoles={['admin', 'auditor', 'jefe_agencia']} allowedPermission="modulo_auditoria">
                 <Audit />
               </ProtectedRoute>
             } />
 
             <Route path="security" element={
-              <ProtectedRoute allowedRoles={['admin', 'riesgos', 'seguridad_fisica']} allowedPermission="modulo_areas_criticas">
+              <ProtectedRoute allowedRoles={['admin', 'riesgos', 'seguridad_fisica', 'auditor']} allowedPermission="modulo_areas_criticas">
                 <Security />
               </ProtectedRoute>
             } />

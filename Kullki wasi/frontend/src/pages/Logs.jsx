@@ -84,8 +84,12 @@ const Logs = () => {
 
   const handlePrintPDF = () => {
     const now = new Date().toLocaleString('es-EC');
+    // Agencia activa: si el usuario seleccionó una manualmente usa esa, si no usa la del contexto
+    const activeAgencyName = filterAgency !== 'ALL'
+      ? agencies.find(a => a.id === filterAgency)?.name || filterAgency
+      : agencies.find(a => a.id === user?.agency)?.name || user?.agency || null;
     const activeFilters = [
-      filterAgency !== 'ALL' && `Agencia: ${agencies.find(a => a.id === filterAgency)?.name || filterAgency}`,
+      activeAgencyName && `Agencia: ${activeAgencyName}`,
       filterArea   !== 'ALL' && `Área: ${filterArea}`,
       filterStatus !== 'ALL' && `Estado: ${filterStatus}`,
       filterRisk   !== 'ALL' && `Riesgo: ${filterRisk}`,
@@ -236,7 +240,7 @@ const Logs = () => {
           <button onClick={handleRefresh} className="btn-icon" title="Refrescar">
             <MdRefresh size={18} />
           </button>
-          <button onClick={handleExport} className="btn-secondary" disabled={logs.length === 0}>
+          <button onClick={handleExport} className="btn-secondary" disabled={filtered.length === 0}>
             <MdFileDownload size={16} className="text-[#79ac34]" />
             Exportar CSV
           </button>

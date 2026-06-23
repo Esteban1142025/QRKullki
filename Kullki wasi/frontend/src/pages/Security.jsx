@@ -28,8 +28,10 @@ const Security = () => {
 
   useEffect(() => { loadAlerts(); }, [loadAlerts]);
 
+  const CAN_MANAGE_ALERTS = ['admin', 'riesgos', 'seguridad_fisica', 'jefe_agencia'];
+
   const openManage = (alert) => {
-    if (user.role !== 'admin' && user.role !== 'riesgos' && user.role !== 'seguridad_fisica') {
+    if (!CAN_MANAGE_ALERTS.includes(user.role)) {
       Swal.fire({
         icon: 'error', title: 'Acceso Denegado',
         text: 'Su rol no tiene privilegios para gestionar alertas de seguridad.',

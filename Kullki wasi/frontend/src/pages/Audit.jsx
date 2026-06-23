@@ -196,10 +196,12 @@ const Audit = () => {
     }
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = (sd = '', ed = '') => {
     if (!dashData) return;
     const { kpis, alerts, monthly_chart, resolved_history } = dashData;
     const now = new Date().toLocaleString('es-EC');
+    const agencyLabel = user?.agencyName || user?.agencyDisplayName || agency || 'Todas las agencias';
+    const periodLabel = sd ? `Período: ${sd}${ed ? ` al ${ed}` : ' en adelante'}` : 'Período: Historial completo';
 
     const monthRows = monthly_chart.map(m =>
       `<tr><td>${m.month} ${m.year}</td><td>${m.total}</td><td class="ok">${m.concedidos}</td><td class="${m.denegados > 0 ? 'rev' : 'ok'}">${m.denegados}</td><td class="${m.value !== null ? (m.value >= 90 ? 'ok' : 'obs') : ''}">${m.value !== null ? m.value + '%' : '—'}</td></tr>`
@@ -233,7 +235,7 @@ ul{padding-left:16px;margin-top:4px}li{font-size:11px;margin-bottom:5px;line-hei
 .footer{margin-top:36px;font-size:9px;color:#94a3b8;text-align:center;border-top:1px solid #e2e8f0;padding-top:11px}
 @media print{body{padding:16px}@page{margin:18mm}}
 </style></head><body>
-<div class="hdr"><h1>🛡️ KULLKI WASI — Informe de Auditoría y Cumplimiento SEPS</h1><p>Generado el: ${now} &nbsp;·&nbsp; Sistema: Kullki Wasi Control Corporativo</p></div>
+<div class="hdr"><h1>🛡️ KULLKI WASI — Informe de Auditoría y Cumplimiento SEPS</h1><p>Generado el: ${now} &nbsp;·&nbsp; Agencia: ${agencyLabel} &nbsp;·&nbsp; ${periodLabel}</p></div>
 <h2>Indicadores Clave</h2>
 <div class="kpi-grid">
   <div class="kpi"><div class="kpi-label">Cumplimiento</div><div class="kpi-value">${kpis.compliance_score}%</div><div class="kpi-sub">${kpis.total_logs} registros evaluados</div></div>
@@ -264,15 +266,17 @@ ul{padding-left:16px;margin-top:4px}li{font-size:11px;margin-bottom:5px;line-hei
     win.document.close();
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = (sd = '', ed = '') => {
     if (!dashData) return;
     const { kpis, alerts, monthly_chart, resolved_history } = dashData;
     const now = new Date().toISOString().slice(0, 10);
+    const agencyLabel = user?.agencyName || user?.agencyDisplayName || agency || 'Todas las agencias';
+    const periodLabel = sd ? `${sd}${ed ? ` al ${ed}` : ' en adelante'}` : 'Historial completo';
     const recs = buildRecommendations(dashData);
 
     const rows = [
       ['KULLKI WASI — Informe de Auditoría y Cumplimiento SEPS'],
-      [`Generado el: ${new Date().toLocaleString('es-EC')}`],
+      [`Generado el: ${new Date().toLocaleString('es-EC')} | Agencia: ${agencyLabel} | Período: ${periodLabel}`],
       [],
       ['INDICADORES CLAVE'],
       ['Indicador', 'Valor', 'Detalle'],
@@ -700,10 +704,10 @@ ul{padding-left:16px;margin-top:4px}li{font-size:11px;margin-bottom:5px;line-hei
               </button>
             </div>
             <div className="p-6 space-y-4">
-              <p className="text-xs text-slate-600">Seleccione un rango de fechas para generar el reporte:</p>
+              <p className="text-xs text-slate-600">Rango de fechas opcional — se incluirá como referencia en el encabezado del reporte:</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Fecha Inicio</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Fecha Inicio (Opcional)</label>
                   <input type="date" value={startDate}
                     max={new Date().toISOString().split('T')[0]}
                     onChange={e => { setStartDate(e.target.value); if (endDate && e.target.value > endDate) setEndDate(''); }}
@@ -723,15 +727,15 @@ ul{padding-left:16px;margin-top:4px}li{font-size:11px;margin-bottom:5px;line-hei
               )}
               <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100 mt-2">
                 <button
-                  onClick={() => { handleExportPDF(); setShowExportModal(false); }}
-                  disabled={!startDate || (!!endDate && endDate < startDate)}
+                  onClick={() => { handleExportPDF(startDate, endDate); setShowExportModal(false); }}
+                  disabled={!!(startDate && endDate && endDate < startDate)}
                   className="btn-secondary text-red-500 disabled:opacity-40"
                 >
                   <MdPictureAsPdf size={16} /> Exportar PDF
                 </button>
                 <button
-                  onClick={() => { handleExportExcel(); setShowExportModal(false); }}
-                  disabled={!startDate || (!!endDate && endDate < startDate)}
+                  onClick={() => { handleExportExcel(startDate, endDate); setShowExportModal(false); }}
+                  disabled={!!(startDate && endDate && endDate < startDate)}
                   className="btn-secondary text-green-600 disabled:opacity-40"
                 >
                   <MdDescription size={16} /> Exportar Excel

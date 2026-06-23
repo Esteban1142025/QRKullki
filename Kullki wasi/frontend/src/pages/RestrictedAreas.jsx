@@ -13,7 +13,7 @@ const HISTORY_KEY = 'kw_area_history';
 const RestrictedAreas = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const canManageAreas = ['admin', 'seguridad_fisica', 'tecnico_ti'].includes(user?.role);
+  const canManageAreas = ['admin', 'seguridad_fisica', 'tecnico_ti', 'jefe_agencia'].includes(user?.role);
   const agency = user?.agency;
 
   const [areas,       setAreas]       = useState([]);
