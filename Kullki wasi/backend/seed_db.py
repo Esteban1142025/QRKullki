@@ -8,249 +8,287 @@ from database import SessionLocal, engine
 import models
 import bcrypt
 
+
+def hash_password(plain: str) -> str:
+    """Genera un hash bcrypt a partir de una contraseña en texto plano."""
+    return bcrypt.hashpw(plain.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+
+def is_bcrypt_hash(value: str) -> bool:
+    """Verifica si un string ya es un hash bcrypt válido ($2b$, $2a$, $2y$)."""
+    if not value:
+        return False
+    return value.startswith(('$2b$', '$2a$', '$2y$')) and len(value) >= 59
+
+
+def upsert_permiso(db, codigo, descripcion):
+    """Crea un permiso si no existe; si existe, lo retorna."""
+    perm = db.query(models.Permiso).filter(
+        models.Permiso.codigo_permiso == codigo
+    ).first()
+    if not perm:
+        perm = models.Permiso(codigo_permiso=codigo, descripcion=descripcion)
+        db.add(perm)
+        db.flush()
+        print(f"  [+] Permiso creado: {codigo}")
+    return perm
+
+
+def upsert_rol(db, nombre, descripcion, permisos_list):
+    """Crea un rol si no existe y le asigna permisos. Si existe, lo retorna."""
+    rol = db.query(models.Rol).filter(models.Rol.nombre == nombre).first()
+    if not rol:
+        rol = models.Rol(nombre=nombre, descripcion=descripcion)
+        for p in permisos_list:
+            rol.permisos.append(p)
+        db.add(rol)
+        db.flush()
+        print(f"  [+] Rol creado: {nombre}")
+    return rol
+
+
+def upsert_agencia(db, nombre, codigo, direccion, telefono=None, tipo="Sucursal"):
+    """Crea o actualiza una agencia por su código o nombre."""
+    agencia = db.query(models.Agencia).filter(
+        models.Agencia.codigo == codigo
+    ).first()
+    if not agencia:
+        # Buscar por el nombre completo o por el código usado como nombre (ej: 'MAT' en el SQL de inicio)
+        agencia = db.query(models.Agencia).filter(
+            (models.Agencia.nombre == nombre) | (models.Agencia.nombre == codigo)
+        ).first()
+
+    if agencia:
+        # Actualizar campos
+        agencia.nombre = nombre  # Asegurar que tenga el nombre completo ("Matriz Ambato" en vez de "MAT")
+        if not agencia.codigo:
+            agencia.codigo = codigo
+        if not agencia.direccion or agencia.direccion == 'Matriz Principal':
+            agencia.direccion = direccion
+        if not agencia.telefono and telefono:
+            agencia.telefono = telefono
+        if not agencia.tipo or agencia.tipo == 'Sucursal':
+            agencia.tipo = tipo
+        db.flush()
+    else:
+        agencia = models.Agencia(
+            nombre=nombre, codigo=codigo, direccion=direccion,
+            telefono=telefono, tipo=tipo, estado=True
+        )
+        db.add(agencia)
+        db.flush()
+        print(f"  [+] Agencia creada: {nombre} ({codigo})")
+    return agencia
+
+
+def upsert_empleado(db, identificacion, nombres, apellidos, email,
+                    agencia, password_plain, rol, departamento=None):
+    """
+    Crea un empleado si no existe.
+    Si ya existe, SIEMPRE actualiza el password_hash a bcrypt para
+    corregir contraseñas en texto plano insertadas por el SQL inicial.
+    También asegura que el rol y la agencia estén correctamente asignados.
+    """
+    emp = db.query(models.Empleado).filter(
+        models.Empleado.identificacion == identificacion
+    ).first()
+
+    new_hash = hash_password(password_plain)
+
+    if emp:
+        # --- Corregir password si está en texto plano o falta ---
+        if not emp.password_hash or not is_bcrypt_hash(emp.password_hash):
+            emp.password_hash = new_hash
+            print(f"  [~] Password actualizado (bcrypt): {identificacion} ({nombres} {apellidos})")
+        # --- Asegurar que tiene el rol correcto ---
+        if rol not in emp.roles:
+            emp.roles.append(rol)
+            print(f"  [~] Rol '{rol.nombre}' asignado a: {identificacion}")
+        # --- Asegurar agencia ---
+        if not emp.id_agencia_base and agencia:
+            emp.id_agencia_base = agencia.id_agencia
+        # --- Asegurar departamento ---
+        if not emp.departamento and departamento:
+            emp.departamento = departamento
+        db.flush()
+    else:
+        emp = models.Empleado(
+            identificacion=identificacion,
+            nombres=nombres,
+            apellidos=apellidos,
+            email=email,
+            id_agencia_base=agencia.id_agencia if agencia else None,
+            password_hash=new_hash,
+            estado_laboral="ACTIVO",
+            departamento=departamento,
+        )
+        emp.roles.append(rol)
+        db.add(emp)
+        db.flush()
+        print(f"  [+] Empleado creado: {identificacion} ({nombres} {apellidos}) -> rol: {rol.nombre}")
+
+    return emp
+
+
 def seed():
+    """Poblar la base de datos con datos iniciales de prueba.
+
+    Este script es IDEMPOTENTE: puede ejecutarse múltiples veces sin
+    duplicar datos. Si los usuarios ya existen (creados por el SQL
+    de inicialización), actualiza sus contraseñas a hashes bcrypt
+    válidos para que el login funcione correctamente.
+    """
+
     # Asegurarnos de que las tablas existan
     models.Base.metadata.create_all(bind=engine)
-    
-    db = SessionLocal()
-    
+
+    # Migración de emergencia: asegurar que la columna 'codigo' exista en 'agencias'
+    # en caso de que el desarrollador tenga un volumen persistente antiguo de la base de datos.
+    from sqlalchemy import text
     try:
-        # 1. Crear Permisos Básicos
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE agencias ADD COLUMN IF NOT EXISTS codigo VARCHAR(10);"))
+            print("  [~] Verificación de esquema: columna 'codigo' en 'agencias' asegurada.")
+    except Exception as e:
+        print(f"  [!] Advertencia al verificar/crear la columna 'codigo' en la tabla 'agencias': {e}")
+
+    db = SessionLocal()
+
+    try:
+        print("=" * 60)
+        print("  SEED: Inicializando base de datos Kullki Wasi")
+        print("=" * 60)
+
+        # ──────────────────────────────────────────────────────────
+        # 1. PERMISOS
+        # ──────────────────────────────────────────────────────────
+        print("\n[1/5] Creando permisos...")
         permisos_data = [
-            {"codigo": "acceso_total", "descripcion": "Acceso a todo el sistema y áreas"},
-            {"codigo": "acceso_boveda", "descripcion": "Acceso a la Bóveda Principal"},
-            {"codigo": "acceso_cajas", "descripcion": "Acceso al Área de Cajas"},
-            {"codigo": "ver_reportes", "descripcion": "Ver reportes de accesos"},
-            {"codigo": "gestionar_usuarios", "descripcion": "Crear y editar empleados"},
+            ("acceso_total",       "Acceso a todo el sistema y áreas"),
+            ("acceso_boveda",      "Acceso a la Bóveda Principal"),
+            ("acceso_cajas",       "Acceso al Área de Cajas"),
+            ("ver_reportes",       "Ver reportes de accesos"),
+            ("gestionar_usuarios", "Crear y editar empleados"),
         ]
-        
-        permisos_db = {}
-        for p in permisos_data:
-            perm = db.query(models.Permiso).filter(models.Permiso.codigo_permiso == p["codigo"]).first()
-            if not perm:
-                perm = models.Permiso(codigo_permiso=p["codigo"], descripcion=p["descripcion"])
-                db.add(perm)
-                db.commit()
-                db.refresh(perm)
-            permisos_db[p["codigo"]] = perm
-
-        # 2. Crear Roles si no existen
-        rol_admin = db.query(models.Rol).filter(models.Rol.nombre == "admin").first()
-        if not rol_admin:
-            rol_admin = models.Rol(nombre="admin", descripcion="Administrador del sistema")
-            rol_admin.permisos.append(permisos_db["acceso_total"])
-            rol_admin.permisos.append(permisos_db["gestionar_usuarios"])
-            db.add(rol_admin)
-            
-        rol_empleado = db.query(models.Rol).filter(models.Rol.nombre == "empleado").first()
-        if not rol_empleado:
-            rol_empleado = models.Rol(nombre="empleado", descripcion="Usuario regular (Cajero)")
-            rol_empleado.permisos.append(permisos_db["acceso_cajas"])
-            db.add(rol_empleado)
-
-        rol_talento_humano = db.query(models.Rol).filter(models.Rol.nombre == "talento_humano").first()
-        if not rol_talento_humano:
-            rol_talento_humano = models.Rol(nombre="talento_humano", descripcion="Gestión de talento humano")
-            rol_talento_humano.permisos.append(permisos_db["gestionar_usuarios"])
-            db.add(rol_talento_humano)
-
-        rol_riesgos = db.query(models.Rol).filter(models.Rol.nombre == "riesgos").first()
-        if not rol_riesgos:
-            rol_riesgos = models.Rol(nombre="riesgos", descripcion="Oficial de riesgos")
-            rol_riesgos.permisos.append(permisos_db["acceso_boveda"])
-            rol_riesgos.permisos.append(permisos_db["ver_reportes"])
-            db.add(rol_riesgos)
-
-        rol_seguridad_fisica = db.query(models.Rol).filter(models.Rol.nombre == "seguridad_fisica").first()
-        if not rol_seguridad_fisica:
-            rol_seguridad_fisica = models.Rol(nombre="seguridad_fisica", descripcion="Seguridad física")
-            rol_seguridad_fisica.permisos.append(permisos_db["acceso_boveda"])
-            rol_seguridad_fisica.permisos.append(permisos_db["ver_reportes"])
-            db.add(rol_seguridad_fisica)
-
-        rol_auditor = db.query(models.Rol).filter(models.Rol.nombre == "auditor").first()
-        if not rol_auditor:
-            rol_auditor = models.Rol(nombre="auditor", descripcion="Auditor interno")
-            rol_auditor.permisos.append(permisos_db["ver_reportes"])
-            db.add(rol_auditor)
-
-        rol_jefe_agencia = db.query(models.Rol).filter(models.Rol.nombre == "jefe_agencia").first()
-        if not rol_jefe_agencia:
-            rol_jefe_agencia = models.Rol(nombre="jefe_agencia", descripcion="Jefe de agencia")
-            rol_jefe_agencia.permisos.append(permisos_db["acceso_cajas"])
-            db.add(rol_jefe_agencia)
-
-        rol_tecnico_ti = db.query(models.Rol).filter(models.Rol.nombre == "tecnico_ti").first()
-        if not rol_tecnico_ti:
-            rol_tecnico_ti = models.Rol(nombre="tecnico_ti", descripcion="Técnico de TI")
-            rol_tecnico_ti.permisos.append(permisos_db["ver_reportes"])
-            db.add(rol_tecnico_ti)
-            
+        permisos = {}
+        for codigo, desc in permisos_data:
+            permisos[codigo] = upsert_permiso(db, codigo, desc)
         db.commit()
-        db.refresh(rol_admin)
-        db.refresh(rol_empleado)
-        db.refresh(rol_talento_humano)
-        db.refresh(rol_riesgos)
-        db.refresh(rol_seguridad_fisica)
-        db.refresh(rol_auditor)
-        db.refresh(rol_jefe_agencia)
-        db.refresh(rol_tecnico_ti)
 
-        # 3. Crear Agencia si no existe
-        agencia = db.query(models.Agencia).filter(models.Agencia.nombre == "MAT").first()
-        if not agencia:
-            agencia = models.Agencia(nombre="MAT", direccion="Matriz Principal", estado=True)
-            db.add(agencia)
-            db.commit()
-            db.refresh(agencia)
-
-        # 4. Crear Usuarios
-        admin_pwd_hash = bcrypt.hashpw("admin123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        empleado_pwd_hash = bcrypt.hashpw("empleado123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        talento_pwd_hash = bcrypt.hashpw("talento123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        riesgos_pwd_hash = bcrypt.hashpw("riesgos123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        seguridad_pwd_hash = bcrypt.hashpw("seguridad123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        auditor_pwd_hash = bcrypt.hashpw("auditor123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        jefe_pwd_hash = bcrypt.hashpw("jefe123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        tecnico_pwd_hash = bcrypt.hashpw("tecnico123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        
-        # Administrador
-        admin = db.query(models.Empleado).filter(models.Empleado.identificacion == "0987654321").first()
-        if not admin:
-            admin = models.Empleado(
-                identificacion="0987654321",
-                nombres="Carlos",
-                apellidos="Ruiz",
-                email="carlos.ruiz@kullkiwasi.com",
-                id_agencia_base=agencia.id_agencia,
-                password_hash=admin_pwd_hash,
-                estado_laboral="ACTIVO"
-            )
-            admin.roles.append(rol_admin)
-            db.add(admin)
-
-        # Usuario Común
-        comun = db.query(models.Empleado).filter(models.Empleado.identificacion == "1712345678").first()
-        if not comun:
-            comun = models.Empleado(
-                identificacion="1712345678",
-                nombres="Maria",
-                apellidos="Garcia",
-                email="maria.garcia@kullkiwasi.com",
-                id_agencia_base=agencia.id_agencia,
-                password_hash=empleado_pwd_hash,
-                estado_laboral="ACTIVO"
-            )
-            comun.roles.append(rol_empleado)
-            db.add(comun)
-
-        # Talento Humano
-        talento = db.query(models.Empleado).filter(models.Empleado.identificacion == "1234567890").first()
-        if not talento:
-            talento = models.Empleado(
-                identificacion="1234567890",
-                nombres="Juan",
-                apellidos="Pérez",
-                email="juan.perez@kullkiwasi.com",
-                id_agencia_base=agencia.id_agencia,
-                password_hash=talento_pwd_hash,
-                estado_laboral="ACTIVO"
-            )
-            talento.roles.append(rol_talento_humano)
-            db.add(talento)
-
-        # Riesgos
-        riesgos = db.query(models.Empleado).filter(models.Empleado.identificacion == "2345678901").first()
-        if not riesgos:
-            riesgos = models.Empleado(
-                identificacion="2345678901",
-                nombres="Ana",
-                apellidos="López",
-                email="ana.lopez@kullkiwasi.com",
-                id_agencia_base=agencia.id_agencia,
-                password_hash=riesgos_pwd_hash,
-                estado_laboral="ACTIVO"
-            )
-            riesgos.roles.append(rol_riesgos)
-            db.add(riesgos)
-
-        # Seguridad Física
-        seguridad = db.query(models.Empleado).filter(models.Empleado.identificacion == "3456789012").first()
-        if not seguridad:
-            seguridad = models.Empleado(
-                identificacion="3456789012",
-                nombres="Carlos",
-                apellidos="Mendoza",
-                email="carlos.mendoza@kullkiwasi.com",
-                id_agencia_base=agencia.id_agencia,
-                password_hash=seguridad_pwd_hash,
-                estado_laboral="ACTIVO"
-            )
-            seguridad.roles.append(rol_seguridad_fisica)
-            db.add(seguridad)
-
-        # Auditor
-        auditor = db.query(models.Empleado).filter(models.Empleado.identificacion == "4567890123").first()
-        if not auditor:
-            auditor = models.Empleado(
-                identificacion="4567890123",
-                nombres="María",
-                apellidos="Torres",
-                email="maria.torres@kullkiwasi.com",
-                id_agencia_base=agencia.id_agencia,
-                password_hash=auditor_pwd_hash,
-                estado_laboral="ACTIVO"
-            )
-            auditor.roles.append(rol_auditor)
-            db.add(auditor)
-
-        # Jefe de Agencia
-        jefe = db.query(models.Empleado).filter(models.Empleado.identificacion == "5678901234").first()
-        if not jefe:
-            jefe = models.Empleado(
-                identificacion="5678901234",
-                nombres="Roberto",
-                apellidos="Sánchez",
-                email="roberto.sanchez@kullkiwasi.com",
-                id_agencia_base=agencia.id_agencia,
-                password_hash=jefe_pwd_hash,
-                estado_laboral="ACTIVO"
-            )
-            jefe.roles.append(rol_jefe_agencia)
-            db.add(jefe)
-
-        # Técnico TI
-        tecnico = db.query(models.Empleado).filter(models.Empleado.identificacion == "6789012345").first()
-        if not tecnico:
-            tecnico = models.Empleado(
-                identificacion="6789012345",
-                nombres="Luis",
-                apellidos="Ramírez",
-                email="luis.ramirez@kullkiwasi.com",
-                id_agencia_base=agencia.id_agencia,
-                password_hash=tecnico_pwd_hash,
-                estado_laboral="ACTIVO"
-            )
-            tecnico.roles.append(rol_tecnico_ti)
-            db.add(tecnico)
-
+        # ──────────────────────────────────────────────────────────
+        # 2. ROLES
+        # ──────────────────────────────────────────────────────────
+        print("\n[2/5] Creando roles...")
+        roles_config = [
+            ("admin",            "Administrador del sistema",  [permisos["acceso_total"], permisos["gestionar_usuarios"]]),
+            ("empleado",         "Usuario regular (Cajero)",   [permisos["acceso_cajas"]]),
+            ("talento_humano",   "Gestión de talento humano",  [permisos["gestionar_usuarios"]]),
+            ("riesgos",          "Oficial de riesgos",         [permisos["acceso_boveda"], permisos["ver_reportes"]]),
+            ("seguridad_fisica", "Seguridad física",           [permisos["acceso_boveda"], permisos["ver_reportes"]]),
+            ("auditor",          "Auditor interno",            [permisos["ver_reportes"]]),
+            ("jefe_agencia",     "Jefe de agencia",            [permisos["acceso_cajas"]]),
+            ("tecnico_ti",       "Técnico de TI",              [permisos["ver_reportes"]]),
+        ]
+        roles = {}
+        for nombre, desc, perms in roles_config:
+            roles[nombre] = upsert_rol(db, nombre, desc, perms)
         db.commit()
-        print("Base de datos poblada con exito.")
-        print("--- Credenciales de Prueba ---")
-        print("Administrador    -> Cedula: 0987654321   | Pass: admin123")
-        print("Empleado         -> Cedula: 1712345678   | Pass: empleado123")
-        print("Talento Humano   -> Cedula: 1234567890   | Pass: talento123")
-        print("Oficial Riesgos  -> Cedula: 2345678901   | Pass: riesgos123")
-        print("Seguridad Fisica -> Cedula: 3456789012   | Pass: seguridad123")
-        print("Auditor Interno  -> Cedula: 4567890123   | Pass: auditor123")
-        print("Jefe de Agencia  -> Cedula: 5678901234   | Pass: jefe123")
-        print("Tecnico TI       -> Cedula: 6789012345   | Pass: tecnico123")
+
+        # ──────────────────────────────────────────────────────────
+        # 3. AGENCIAS
+        # ──────────────────────────────────────────────────────────
+        print("\n[3/5] Creando agencias...")
+        agencias_data = [
+            ("Matriz Ambato",         "MAT", "Av. Juan Benigno Vela y Martínez, Ambato", "032-824-567", "Principal"),
+            ("Agencia Pelileo",       "PEL", "Calle Padre Jorge y Av. Confraternidad, Pelileo", "032-871-234", "Sucursal"),
+            ("Agencia Píllaro",       "PIL", "Calle Sucre y Bolívar, Píllaro",                  "032-873-456", "Sucursal"),
+            ("Agencia Baños",         "BAN", "Calle Ambato y Thomas Halflants, Baños",           "032-740-123", "Sucursal"),
+            ("Agencia Salcedo",       "SAL", "Calle Sucre y 24 de Mayo, Salcedo",                "032-726-789", "Sucursal"),
+            ("Agencia Quisapincha",   "QUI", "Vía principal, Quisapincha",                       "032-841-567", "Extensión"),
+        ]
+        agencias = {}
+        for nombre, codigo, dir, tel, tipo in agencias_data:
+            agencias[codigo] = upsert_agencia(db, nombre, codigo, dir, tel, tipo)
+        db.commit()
+
+        # ──────────────────────────────────────────────────────────
+        # 4. USUARIOS DE PRUEBA (Matriz)
+        # ──────────────────────────────────────────────────────────
+        print("\n[4/5] Creando/actualizando usuarios de prueba...")
+        usuarios_matriz = [
+            # (cédula,       nombres,   apellidos,  email,                             password,       rol)
+            ("0987654321", "Carlos",   "Ruiz",     "carlos.ruiz@kullkiwasi.com",       "admin123",      "admin"),
+            ("1712345678", "Maria",    "Garcia",   "maria.garcia@kullkiwasi.com",      "empleado123",   "empleado"),
+            ("1234567890", "Juan",     "Pérez",    "juan.perez@kullkiwasi.com",        "talento123",    "talento_humano"),
+            ("2345678901", "Ana",      "López",    "ana.lopez@kullkiwasi.com",         "riesgos123",    "riesgos"),
+            ("3456789012", "Carlos",   "Mendoza",  "carlos.mendoza@kullkiwasi.com",    "seguridad123",  "seguridad_fisica"),
+            ("4567890123", "María",    "Torres",   "maria.torres@kullkiwasi.com",      "auditor123",    "auditor"),
+            ("5678901234", "Roberto",  "Sánchez",  "roberto.sanchez@kullkiwasi.com",   "jefe123",       "jefe_agencia"),
+            ("6789012345", "Luis",     "Ramírez",  "luis.ramirez@kullkiwasi.com",      "tecnico123",    "tecnico_ti"),
+        ]
+
+        for cedula, nombres, apellidos, email, pwd, rol_nombre in usuarios_matriz:
+            upsert_empleado(
+                db, cedula, nombres, apellidos, email,
+                agencias["MAT"], pwd, roles[rol_nombre]
+            )
+        db.commit()
+
+        # ──────────────────────────────────────────────────────────
+        # 5. ADMINISTRADORES POR AGENCIA
+        # ──────────────────────────────────────────────────────────
+        print("\n[5/5] Creando/actualizando administradores por agencia...")
+        admins_agencia = [
+            ("1800000001", "Diego",    "Martínez", "admin.pelileo@kullkiwasi.fin.ec",     "Admin2024.", "PEL"),
+            ("1800000002", "Lucía",    "Herrera",  "admin.pillaro@kullkiwasi.fin.ec",     "Admin2024.", "PIL"),
+            ("1800000003", "Andrés",   "Vásquez",  "admin.banos@kullkiwasi.fin.ec",       "Admin2024.", "BAN"),
+            ("1800000004", "Paola",    "Cevallos", "admin.salcedo@kullkiwasi.fin.ec",     "Admin2024.", "SAL"),
+            ("1800000005", "Fernando", "Ortiz",    "admin.quisapincha@kullkiwasi.fin.ec", "Admin2024.", "QUI"),
+        ]
+
+        for cedula, nombres, apellidos, email, pwd, ag_codigo in admins_agencia:
+            upsert_empleado(
+                db, cedula, nombres, apellidos, email,
+                agencias[ag_codigo], pwd, roles["admin"],
+                departamento="Administración"
+            )
+        db.commit()
+
+        # ──────────────────────────────────────────────────────────
+        # RESUMEN
+        # ──────────────────────────────────────────────────────────
+        total_empleados = db.query(models.Empleado).count()
+        total_agencias  = db.query(models.Agencia).count()
+        total_roles     = db.query(models.Rol).count()
+
+        print("\n" + "=" * 60)
+        print("  ✓ Base de datos poblada con éxito")
+        print(f"    Empleados: {total_empleados}  |  Agencias: {total_agencias}  |  Roles: {total_roles}")
+        print("=" * 60)
+        print("\n--- Credenciales de Prueba (Matriz) ---")
+        print("Administrador    -> Cédula: 0987654321   | Pass: admin123")
+        print("Empleado         -> Cédula: 1712345678   | Pass: empleado123")
+        print("Talento Humano   -> Cédula: 1234567890   | Pass: talento123")
+        print("Oficial Riesgos  -> Cédula: 2345678901   | Pass: riesgos123")
+        print("Seguridad Física -> Cédula: 3456789012   | Pass: seguridad123")
+        print("Auditor Interno  -> Cédula: 4567890123   | Pass: auditor123")
+        print("Jefe de Agencia  -> Cédula: 5678901234   | Pass: jefe123")
+        print("Técnico TI       -> Cédula: 6789012345   | Pass: tecnico123")
+        print("\n--- Admins por Agencia (pass: Admin2024.) ---")
+        print("Pelileo          -> Cédula: 1800000001")
+        print("Píllaro          -> Cédula: 1800000002")
+        print("Baños            -> Cédula: 1800000003")
+        print("Salcedo          -> Cédula: 1800000004")
+        print("Quisapincha      -> Cédula: 1800000005")
 
     except Exception as e:
-        print(f"Error al poblar la base de datos: {e}")
+        print(f"\n[ERROR] Error al poblar la base de datos: {e}")
+        import traceback
+        traceback.print_exc()
         db.rollback()
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     seed()
