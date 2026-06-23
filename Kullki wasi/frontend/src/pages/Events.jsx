@@ -5,7 +5,7 @@ import {
   MdHistory, MdSearch, MdRefresh, MdDeleteForever,
   MdCheckCircle, MdCancel, MdFilterList, MdShield, MdPerson,
 } from 'react-icons/md';
-import { readEvents, EVENTS_KEY } from '../utils/eventLogger';
+import { readEvents, clearEvents } from '../utils/eventLogger';
 
 const ROLE_NAMES = {
   admin:            'Administrador General',
@@ -33,7 +33,9 @@ const Events = () => {
   const [filterRole, setFilterRole] = useState('ALL');
   const [filterAction, setFilterAction] = useState('ALL');
 
-  const load = useCallback(() => setEvents(readEvents()), []);
+  const agency = user?.agency;
+
+  const load = useCallback(() => setEvents(readEvents(agency)), [agency]);
   useEffect(() => { load(); }, [load]);
 
   const uniqueRoles = [...new Set(events.map(e => e.role))];
@@ -66,7 +68,7 @@ const Events = () => {
       background: '#ffffff', color: '#1e293b',
     });
     if (!res.isConfirmed) return;
-    localStorage.removeItem(EVENTS_KEY);
+    clearEvents(agency);
     setEvents([]);
     Swal.fire({ icon: 'success', title: 'Historial limpiado', timer: 1400, showConfirmButton: false, background: '#ffffff', color: '#1e293b' });
   };
@@ -82,7 +84,7 @@ const Events = () => {
         <div>
           <h2 className="text-2xl font-black text-slate-800 font-['Outfit']">Eventos de Permisos</h2>
           <p className="text-sm text-slate-500 mt-1">
-            Registro completo de todos los cambios de permisos realizados por el administrador.
+            Registro de cambios de permisos realizados en la agencia <span className="font-bold text-slate-700">{user?.agencyName || agency}</span>.
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -231,7 +233,7 @@ const Events = () => {
         </div>
         <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-[10px] text-slate-500">
           <span>Mostrando {filtered.length} de {events.length} eventos</span>
-          <span>Cooperativa Kullki Wasi — Auditoría RBAC</span>
+          <span>Agencia: {agency} — Auditoría RBAC</span>
         </div>
       </div>
 

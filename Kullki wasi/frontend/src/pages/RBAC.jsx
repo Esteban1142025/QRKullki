@@ -209,7 +209,10 @@ const RBAC = () => {
       const res = await apiClient.put(`/roles/${role.id_rol}`, { permissions: role.permissions });
       const savedPerms = res.data.permissions || role.permissions;
 
-      logPermissionChanges(user, activeRoleId, activeRole.name, prevPerms, savedPerms);
+      // Construir mapa de labels para permisos dinámicos de área
+      const areaLabelMap = {};
+      agencyAreas.forEach(a => { if (a.permiso_codigo) areaLabelMap[a.permiso_codigo] = a.name; });
+      logPermissionChanges(user, activeRoleId, activeRole.name, prevPerms, savedPerms, areaLabelMap);
       originalPermsRef.current = { ...originalPermsRef.current, [activeRoleId]: [...savedPerms] };
 
       const moduleLabels = savedPerms

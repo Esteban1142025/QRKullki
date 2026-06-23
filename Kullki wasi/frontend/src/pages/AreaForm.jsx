@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
-  MdArrowBack, MdSave, MdAdd, MdEdit, MdDelete, MdCheck, MdClose, MdTune
+  MdArrowBack, MdSave, MdAdd, MdEdit, MdDelete, MdCheck, MdClose, MdTune,
+  MdToggleOn, MdToggleOff
 } from 'react-icons/md';
 import Swal from 'sweetalert2';
 import apiClient from '../services/api/apiClient';
@@ -71,6 +72,7 @@ const AreaForm = () => {
   const [riskLevel,    setRiskLevel]    = useState('Bajo');
   const [schedule,     setSchedule]     = useState('');
   const [scheduleMode, setScheduleMode] = useState('preset');
+  const [estadoActivo, setEstadoActivo] = useState(true);
   const [agencias,     setAgencias]     = useState([]);
   const [agenciaId,    setAgenciaId]    = useState(null);
   const [saving,       setSaving]       = useState(false);
@@ -79,6 +81,7 @@ const AreaForm = () => {
   useEffect(() => {
     if (!isEdit || !area) return;
     setRiskLevel(area.riskLevel || 'Bajo');
+    setEstadoActivo(area.status === 'Protegido');
     const fresh    = readSchedules(agency);
     const isPreset = fresh.some(s => s.value === area.schedule && s.active);
     setSchedule(area.schedule || '');
@@ -161,14 +164,15 @@ const AreaForm = () => {
     setSaving(true);
     try {
       if (isEdit) {
-        await apiClient.put(`/areas/${areaId}`, { nivel_riesgo: riskLevel, horario: schedule });
+        await apiClient.put(`/areas/${areaId}`, { nivel_riesgo: riskLevel, horario: schedule, estado: estadoActivo });
         try {
           const histKey = agencyKey(HISTORY_KEY, agency);
           const prev    = JSON.parse(localStorage.getItem(histKey) || '[]');
+          const estadoLabel = estadoActivo ? 'Activa' : 'Inactiva';
           localStorage.setItem(histKey, JSON.stringify([{
             id: Date.now(), areaId: area.id, areaName: area.name,
             timestamp: new Date().toISOString(), user: user?.name || 'Sistema',
-            changes: `Actualizado: Riesgo(${riskLevel}), Horario(${schedule})`,
+            changes: `Actualizado: Riesgo(${riskLevel}), Horario(${schedule}), Estado(${estadoLabel})`,
           }, ...prev]));
         } catch {}
         Swal.fire({ icon: 'success', title: 'Área Actualizada', timer: 1500, showConfirmButton: false, background: '#ffffff', color: '#1e293b' });
@@ -254,6 +258,21 @@ const AreaForm = () => {
               <option>Bajo</option><option>Medio</option><option>Alto</option><option>Crítico</option>
             </select>
           </div>
+
+          {isEdit && (
+            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200">
+              <div>
+                <p className="text-xs font-bold text-slate-700">Estado del Área</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  {estadoActivo ? 'Activa y monitoreada' : 'Desactivada — no aparece en métricas'}
+                </p>
+              </div>
+              <button type="button" onClick={() => setEstadoActivo(v => !v)}
+                className={`text-4xl transition-colors cursor-pointer ${estadoActivo ? 'text-[#84cc16]' : 'text-slate-300'}`}>
+                {estadoActivo ? <MdToggleOn /> : <MdToggleOff />}
+              </button>
+            </div>
+          )}
 
           {!isEdit && (
             <div className="space-y-1.5">

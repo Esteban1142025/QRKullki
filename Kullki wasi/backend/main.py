@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Request
+from fastapi import FastAPI, Depends, HTTPException, status, Request, Query
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -257,6 +257,7 @@ class AgenciaCreate(BaseModel):
 class AreaUpdate(BaseModel):
     nivel_riesgo: Optional[str] = None
     horario: Optional[str] = None
+    estado: Optional[bool] = None
 
     @field_validator('nivel_riesgo')
     @classmethod
@@ -818,9 +819,11 @@ def actualizar_area(id_area: int, data: AreaUpdate, db: Session = Depends(get_db
         a.nivel_riesgo = data.nivel_riesgo
     if data.horario:
         a.horario = data.horario
+    if data.estado is not None:
+        a.estado = data.estado
     db.commit()
     db.refresh(a)
-    return {"id": f"AR-{a.id_area}", "name": a.nombre, "riskLevel": a.nivel_riesgo, "schedule": a.horario}
+    return {"id": f"AR-{a.id_area}", "name": a.nombre, "riskLevel": a.nivel_riesgo, "schedule": a.horario, "status": "Protegido" if a.estado else "Inactivo"}
 
 @app.delete("/api/v1/areas/{id_area}", status_code=204)
 def eliminar_area(id_area: int, db: Session = Depends(get_db)):
@@ -874,49 +877,88 @@ def actualizar_rol(id_rol: int, data: dict, db: Session = Depends(get_db)):
 # --- Dashboard de Auditoría ---
 
 @app.get("/api/v1/audit/dashboard")
-def get_audit_dashboard(db: Session = Depends(get_db)):
+def get_audit_dashboard(agency: Optional[str] = Query(None), db: Session = Depends(get_db)):
     from sqlalchemy import func, extract
 
-    # Totales de bitácora
-    total_logs   = db.query(func.count(models.BitacoraAcceso.id_bitacora)).scalar() or 0
-    concedidos   = db.query(func.count(models.BitacoraAcceso.id_bitacora)).filter(models.BitacoraAcceso.resultado == "CONCEDIDO").scalar() or 0
-    denegados    = db.query(func.count(models.BitacoraAcceso.id_bitacora)).filter(models.BitacoraAcceso.resultado == "DENEGADO").scalar() or 0
+    # Resolver agencia
+    ag_id = None
+    if agency:
+        ag_obj = db.query(models.Agencia).filter(models.Agencia.codigo == agency).first()
+        if ag_obj:
+            ag_id = ag_obj.id_agencia
 
-    compliance   = round(concedidos / total_logs * 100, 1) if total_logs > 0 else 100.0
-    risk_level   = round(denegados  / total_logs * 100, 1) if total_logs > 0 else 0.0
+    # Helper: query base de bitácora filtrada por agencia
+    def log_q(extra_filters=None):
+        q = db.query(func.count(models.BitacoraAcceso.id_bitacora))
+        if ag_id:
+            q = q.outerjoin(models.Empleado, models.BitacoraAcceso.id_empleado == models.Empleado.id_empleado)\
+                 .filter(models.Empleado.id_agencia_base == ag_id)
+        if extra_filters:
+            q = q.filter(*extra_filters)
+        return q.scalar() or 0
 
-    # Alertas por estado
-    total_alerts   = db.query(func.count(models.AlertaSeguridad.id_alerta)).scalar() or 0
-    open_alerts    = db.query(func.count(models.AlertaSeguridad.id_alerta)).filter(models.AlertaSeguridad.estado == "ABIERTA").scalar() or 0
-    investigating  = db.query(func.count(models.AlertaSeguridad.id_alerta)).filter(models.AlertaSeguridad.estado == "EN_INVESTIGACION").scalar() or 0
-    resolved_alerts = db.query(func.count(models.AlertaSeguridad.id_alerta)).filter(models.AlertaSeguridad.estado == "RESUELTA").scalar() or 0
+    total_logs = log_q()
+    concedidos = log_q([models.BitacoraAcceso.resultado == "CONCEDIDO"])
+    denegados  = log_q([models.BitacoraAcceso.resultado == "DENEGADO"])
 
-    # Áreas y empleados activos
-    active_areas     = db.query(func.count(models.AreaRestringida.id_area)).filter(models.AreaRestringida.estado == True).scalar() or 0
-    total_areas      = db.query(func.count(models.AreaRestringida.id_area)).scalar() or 0
-    active_employees = db.query(func.count(models.Empleado.id_empleado)).filter(models.Empleado.estado_laboral == "ACTIVO").scalar() or 0
-    total_roles      = db.query(func.count(models.Rol.id_rol)).filter(models.Rol.activo == True).scalar() or 0
+    compliance = round(concedidos / total_logs * 100, 1) if total_logs > 0 else 100.0
+    risk_level = round(denegados  / total_logs * 100, 1) if total_logs > 0 else 0.0
 
-    # Dispositivos activos
-    active_devices = db.query(func.count(models.DispositivoEscaneo.id_dispositivo)).filter(models.DispositivoEscaneo.estado == True).scalar() or 0
+    # Helper: query base de alertas filtrada por agencia (via bitácora → área → agencia)
+    def alert_q(extra_filters=None):
+        q = db.query(func.count(models.AlertaSeguridad.id_alerta))
+        if ag_id:
+            q = q.outerjoin(models.BitacoraAcceso, models.AlertaSeguridad.id_bitacora_asociada == models.BitacoraAcceso.id_bitacora)\
+                 .outerjoin(models.AreaRestringida, models.BitacoraAcceso.id_area == models.AreaRestringida.id_area)\
+                 .filter(models.AreaRestringida.id_agencia == ag_id)
+        if extra_filters:
+            q = q.filter(*extra_filters)
+        return q.scalar() or 0
+
+    total_alerts    = alert_q()
+    open_alerts     = alert_q([models.AlertaSeguridad.estado == "ABIERTA"])
+    investigating   = alert_q([models.AlertaSeguridad.estado == "EN_INVESTIGACION"])
+    resolved_alerts = alert_q([models.AlertaSeguridad.estado == "RESUELTA"])
+
+    # Áreas filtradas por agencia
+    area_q = db.query(models.AreaRestringida)
+    if ag_id:
+        area_q = area_q.filter(models.AreaRestringida.id_agencia == ag_id)
+    active_areas = area_q.filter(models.AreaRestringida.estado == True).with_entities(func.count()).scalar() or 0
+    total_areas  = area_q.with_entities(func.count()).scalar() or 0
+
+    # Empleados activos filtrados por agencia
+    emp_q = db.query(func.count(models.Empleado.id_empleado)).filter(models.Empleado.estado_laboral == "ACTIVO")
+    if ag_id:
+        emp_q = emp_q.filter(models.Empleado.id_agencia_base == ag_id)
+    active_employees = emp_q.scalar() or 0
+
+    total_roles  = db.query(func.count(models.Rol.id_rol)).filter(models.Rol.activo == True).scalar() or 0
+
+    # Dispositivos activos filtrados por agencia
+    dev_q = db.query(func.count(models.DispositivoEscaneo.id_dispositivo)).filter(models.DispositivoEscaneo.estado == True)
+    if ag_id:
+        dev_q = dev_q.outerjoin(models.AreaRestringida, models.DispositivoEscaneo.id_area == models.AreaRestringida.id_area)\
+                     .filter(models.AreaRestringida.id_agencia == ag_id)
+    active_devices = dev_q.scalar() or 0
 
     # Datos mensuales — últimos 6 meses
     now = datetime.datetime.utcnow()
     month_names = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
     monthly_data = []
     for i in range(5, -1, -1):
-        raw_month  = now.month - i
+        raw_month = now.month - i
         year  = now.year + (raw_month - 1) // 12
         month = ((raw_month - 1) % 12) + 1
-        m_total = db.query(func.count(models.BitacoraAcceso.id_bitacora)).filter(
+        m_total = log_q([
             extract('year',  models.BitacoraAcceso.fecha_hora) == year,
             extract('month', models.BitacoraAcceso.fecha_hora) == month,
-        ).scalar() or 0
-        m_conc = db.query(func.count(models.BitacoraAcceso.id_bitacora)).filter(
+        ])
+        m_conc = log_q([
             extract('year',  models.BitacoraAcceso.fecha_hora) == year,
             extract('month', models.BitacoraAcceso.fecha_hora) == month,
             models.BitacoraAcceso.resultado == "CONCEDIDO",
-        ).scalar() or 0
+        ])
         monthly_data.append({
             "month": month_names[month - 1],
             "year": year,
@@ -926,10 +968,13 @@ def get_audit_dashboard(db: Session = Depends(get_db)):
             "denegados": m_total - m_conc,
         })
 
-    # Últimas 10 alertas resueltas (para historial)
-    resolved_history = db.query(models.AlertaSeguridad).filter(
-        models.AlertaSeguridad.estado == "RESUELTA"
-    ).order_by(models.AlertaSeguridad.fecha_generacion.desc()).limit(10).all()
+    # Últimas 10 alertas resueltas (historial), filtradas por agencia
+    hist_q = db.query(models.AlertaSeguridad).filter(models.AlertaSeguridad.estado == "RESUELTA")
+    if ag_id:
+        hist_q = hist_q.outerjoin(models.BitacoraAcceso, models.AlertaSeguridad.id_bitacora_asociada == models.BitacoraAcceso.id_bitacora)\
+                       .outerjoin(models.AreaRestringida, models.BitacoraAcceso.id_area == models.AreaRestringida.id_area)\
+                       .filter(models.AreaRestringida.id_agencia == ag_id)
+    resolved_history = hist_q.order_by(models.AlertaSeguridad.fecha_generacion.desc()).limit(10).all()
     history = [{
         "id":     f"ALT-{a.id_alerta}",
         "date":   utc_iso(a.fecha_generacion),
@@ -964,8 +1009,14 @@ def get_audit_dashboard(db: Session = Depends(get_db)):
 # --- Bitácora / Logs ---
 
 @app.get("/api/v1/audit-logs")
-def listar_logs(db: Session = Depends(get_db)):
-    logs = db.query(models.BitacoraAcceso).order_by(models.BitacoraAcceso.fecha_hora.desc()).limit(200).all()
+def listar_logs(agency: Optional[str] = Query(None), db: Session = Depends(get_db)):
+    q = db.query(models.BitacoraAcceso).order_by(models.BitacoraAcceso.fecha_hora.desc())
+    if agency:
+        ag = db.query(models.Agencia).filter(models.Agencia.codigo == agency).first()
+        if ag:
+            q = q.outerjoin(models.Empleado, models.BitacoraAcceso.id_empleado == models.Empleado.id_empleado)\
+                 .filter(models.Empleado.id_agencia_base == ag.id_agencia)
+    logs = q.limit(200).all()
     result = []
     for l in logs:
         emp_name = f"{l.empleado.nombres} {l.empleado.apellidos}" if l.empleado else "Desconocido"
@@ -992,8 +1043,15 @@ def listar_logs(db: Session = Depends(get_db)):
 # --- Alertas de Seguridad ---
 
 @app.get("/api/v1/security/alerts")
-def listar_alertas(db: Session = Depends(get_db)):
-    alertas = db.query(models.AlertaSeguridad).order_by(models.AlertaSeguridad.fecha_generacion.desc()).all()
+def listar_alertas(agency: Optional[str] = Query(None), db: Session = Depends(get_db)):
+    q = db.query(models.AlertaSeguridad).order_by(models.AlertaSeguridad.fecha_generacion.desc())
+    if agency:
+        ag = db.query(models.Agencia).filter(models.Agencia.codigo == agency).first()
+        if ag:
+            q = q.outerjoin(models.BitacoraAcceso, models.AlertaSeguridad.id_bitacora_asociada == models.BitacoraAcceso.id_bitacora)\
+                 .outerjoin(models.AreaRestringida, models.BitacoraAcceso.id_area == models.AreaRestringida.id_area)\
+                 .filter(models.AreaRestringida.id_agencia == ag.id_agencia)
+    alertas = q.all()
     result = []
     for a in alertas:
         motivo = a.bitacora.motivo if a.bitacora else "Sin detalles"

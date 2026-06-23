@@ -1,3 +1,5 @@
+import { agencyKey, agencyGet, agencySet, agencyRemove } from './agencyStorage';
+
 export const EVENTS_KEY = 'kw_perm_events';
 const MAX_EVENTS = 300;
 
@@ -15,43 +17,59 @@ export const PERM_LABELS = {
   acceso_total:         'Acceso Total a Áreas Físicas',
 };
 
-export const readEvents = () => {
-  try {
-    return JSON.parse(localStorage.getItem(EVENTS_KEY) || '[]');
-  } catch {
-    return [];
-  }
+// Resuelve el label de un permiso — soporta códigos estáticos y dinámicos (area_X)
+const resolveLabel = (permCode, extraLabels = {}) => {
+  if (extraLabels[permCode]) return extraLabels[permCode];
+  if (PERM_LABELS[permCode]) return PERM_LABELS[permCode];
+  if (/^area_\d+$/.test(permCode)) return `Área física (${permCode})`;
+  return permCode;
 };
 
+// Lee eventos de la agencia indicada
+export const readEvents = (agency) =>
+  agencyGet(EVENTS_KEY, agency, []);
+
+// Elimina eventos de la agencia indicada
+export const clearEvents = (agency) =>
+  agencyRemove(EVENTS_KEY, agency);
+
 // Detecta diferencias y guarda un evento por cada permiso cambiado.
-// Devuelve el número de eventos registrados.
-export const logPermissionChanges = (adminUser, roleId, roleName, oldPerms, newPerms) => {
-  const now = new Date().toISOString();
+// extraLabels: mapa { permCode: 'Nombre legible' } para permisos dinámicos de área.
+export const logPermissionChanges = (adminUser, roleId, roleName, oldPerms, newPerms, extraLabels = {}) => {
+  const agency = adminUser?.agency;
+  const now    = new Date().toISOString();
   const granted = newPerms.filter(p => !oldPerms.includes(p));
   const revoked  = oldPerms.filter(p => !newPerms.includes(p));
 
   if (granted.length === 0 && revoked.length === 0) return 0;
 
-  const base = { timestamp: now, by: adminUser?.name || '—', by_dni: adminUser?.dni || '', role: roleId, roleName };
+  const base = {
+    timestamp: now,
+    by:        adminUser?.name || '—',
+    by_dni:    adminUser?.dni  || '',
+    agency,
+    role:      roleId,
+    roleName,
+  };
 
   const newEntries = [
     ...granted.map(p => ({
       ...base,
-      id:               `evt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      permission:       p,
-      permissionLabel:  PERM_LABELS[p] || p,
-      action:           'granted',
+      id:              `evt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      permission:      p,
+      permissionLabel: resolveLabel(p, extraLabels),
+      action:          'granted',
     })),
     ...revoked.map(p => ({
       ...base,
-      id:               `evt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      permission:       p,
-      permissionLabel:  PERM_LABELS[p] || p,
-      action:           'revoked',
+      id:              `evt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      permission:      p,
+      permissionLabel: resolveLabel(p, extraLabels),
+      action:          'revoked',
     })),
   ];
 
-  const existing = readEvents();
-  localStorage.setItem(EVENTS_KEY, JSON.stringify([...newEntries, ...existing].slice(0, MAX_EVENTS)));
+  const existing = readEvents(agency);
+  agencySet(EVENTS_KEY, agency, [...newEntries, ...existing].slice(0, MAX_EVENTS));
   return newEntries.length;
 };

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import apiClient from '../services/api/apiClient';
+import { useAuth } from '../context/AuthContext';
 import {
   MdVerifiedUser, MdCheckCircle, MdSecurity, MdAssessment,
   MdPlayCircleFilled, MdClose, MdWarning, MdAssignmentLate,
@@ -52,6 +53,8 @@ const buildRecommendations = (data) => {
 };
 
 const Audit = () => {
+  const { user } = useAuth();
+  const agency = user?.agency;
   const [dashData, setDashData] = useState(null);
   const [loading, setLoading]   = useState(true);
   const [showReport, setShowReport]     = useState(false);
@@ -66,14 +69,14 @@ const Audit = () => {
     setLoading(true);
     try {
       // Intentar el endpoint dedicado primero
-      const res = await apiClient.get('/audit/dashboard');
+      const res = await apiClient.get('/audit/dashboard', { params: { agency } });
       setDashData(res.data);
     } catch {
       // Fallback: derivar métricas de los endpoints existentes en paralelo
       try {
         const [alertsRes, logsRes] = await Promise.allSettled([
-          apiClient.get('/security/alerts'),
-          apiClient.get('/audit-logs'),
+          apiClient.get('/security/alerts', { params: { agency } }),
+          apiClient.get('/audit-logs', { params: { agency } }),
         ]);
 
         const alertsList = alertsRes.status === 'fulfilled' ? alertsRes.value.data : [];
@@ -141,21 +144,21 @@ const Audit = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [agency]);
 
   useEffect(() => { loadDashboard(); }, [loadDashboard]);
 
   useEffect(() => {
-    const load = () => setRecentEvents(readEvents().slice(0, 5));
+    const load = () => setRecentEvents(readEvents(agency).slice(0, 5));
     load();
     const t = setInterval(load, 10000);
     return () => clearInterval(t);
-  }, []);
+  }, [agency]);
 
   const runSystemAudit = async () => {
     setRunningAudit(true);
     try {
-      const res = await apiClient.get('/audit/dashboard');
+      const res = await apiClient.get('/audit/dashboard', { params: { agency } });
       setDashData(res.data);
       const d = res.data;
       const report = {
