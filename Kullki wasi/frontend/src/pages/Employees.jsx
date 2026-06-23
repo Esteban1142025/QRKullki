@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 // Metadatos visuales de roles (constantes de UI, no datos de negocio)
 const ROLES = {
@@ -13,10 +13,11 @@ const ROLES = {
 };
 import apiClient from '../services/api/apiClient';
 import { QRCodeSVG } from 'qrcode.react';
+import { generateQRToken, getTimeoutMs, getWindowEnd } from '../utils/qrToken';
 import Swal from 'sweetalert2';
 import {
   MdSearch, MdAdd, MdEdit, MdDelete, MdQrCode,
-  MdClose, MdSave, MdPrint, MdPeople, MdBadge, MdRefresh
+  MdClose, MdSave, MdPeople, MdBadge, MdRefresh
 } from 'react-icons/md';
 
 // Convierte el detalle de error de FastAPI (string o array de objetos) a texto legible
@@ -56,7 +57,50 @@ const Employees = () => {
   const [qrEmployee, setQrEmployee]   = useState(null);
   const [form, setForm]               = useState(BLANK_FORM);
 
+  // Timer global sincronizado para TODOS los empleados a la vez
+  const [qrTokenMap, setQrTokenMap]         = useState({});   // id_empleado → token
+  const [syncSecondsLeft, setSyncSecondsLeft] = useState(0);
+  const syncRotateRef                         = useRef(null);
+  const syncTickRef                           = useRef(null);
+
   const fireSwal = (opts) => Swal.fire({ background: '#0d1424', color: '#f1f5f9', ...opts });
+
+  // Genera tokens para todos los empleados y arranca el contador global
+  useEffect(() => {
+    if (employees.length === 0) return;
+
+    const refreshAll = () => {
+      clearTimeout(syncRotateRef.current);
+      clearInterval(syncTickRef.current);
+
+      const windowEnd = getWindowEnd();
+      const map = {};
+      employees.forEach(emp => {
+        if (emp.id_empleado) map[emp.id_empleado] = generateQRToken(emp.id_empleado);
+      });
+      setQrTokenMap(map);
+      setSyncSecondsLeft(Math.max(0, Math.round((windowEnd - Date.now()) / 1000)));
+
+      // Rotar todos al final de la ventana
+      syncRotateRef.current = setTimeout(refreshAll, Math.max(0, windowEnd - Date.now()));
+
+      // Contador basado en el tiempo real de la ventana
+      syncTickRef.current = setInterval(() => {
+        setSyncSecondsLeft(Math.max(0, Math.round((windowEnd - Date.now()) / 1000)));
+      }, 1000);
+    };
+
+    refreshAll();
+
+    const onConfigChanged = () => refreshAll();
+    window.addEventListener('kw:config-changed', onConfigChanged);
+
+    return () => {
+      clearTimeout(syncRotateRef.current);
+      clearInterval(syncTickRef.current);
+      window.removeEventListener('kw:config-changed', onConfigChanged);
+    };
+  }, [employees]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Parsea "YYYY-MM-DD" como fecha LOCAL para evitar el desfase UTC que retrocede 1 día
   const parseLocalDate = (dateStr) => {
@@ -597,8 +641,11 @@ const Employees = () => {
                     <p className="text-[8px] text-slate-500 uppercase">Credencial de Acceso</p>
                   </div>
                 </div>
-                <div className="p-3 bg-white rounded-xl shadow-md border border-slate-100">
-                  <QRCodeSVG value={qrEmployee.qrCode ?? 'KW-NO-QR'} size={150} fgColor="#1e293b" level="H" />
+                <div className="p-3 bg-white rounded-xl shadow-md border border-slate-100 relative">
+                  <QRCodeSVG value={qrTokenMap[qrEmployee?.id_empleado] || 'KW-NO-QR'} size={150} fgColor="#1e293b" level="H" />
+                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] font-mono font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
+                    {(() => { const h = Math.floor(syncSecondsLeft/3600); const m = Math.floor((syncSecondsLeft%3600)/60); const s = syncSecondsLeft%60; return h > 0 ? `Rota en ${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `Rota en ${m}:${String(s).padStart(2,'0')}`; })()}
+                  </div>
                 </div>
                 <div className="text-center">
                   <p className="font-bold text-slate-800 text-sm">{qrEmployee.name}</p>
@@ -617,14 +664,11 @@ const Employees = () => {
                     <span className={`font-bold ${qrEmployee.status === 'Activo' ? 'text-[#8DC63F]' : 'text-red-500'}`}>{qrEmployee.status}</span>
                   </div>
                 </div>
-                <div className="w-full pt-3 border-t border-slate-100 text-center">
-                  <p className="text-[8px] text-slate-400 font-mono break-all">{qrEmployee.qrCode}</p>
+                <div className="w-full pt-3 border-t border-slate-100 text-center space-y-1">
+                  <p className="text-[8px] text-[#79ac34] font-bold uppercase tracking-wider">Credencial Dinámica · Renovación automática</p>
+                  <p className="text-[7px] text-slate-400 font-mono break-all">{(qrTokenMap[qrEmployee?.id_empleado] || '').slice(0, 40)}…</p>
                 </div>
               </div>
-              <button onClick={() => handlePrint(qrEmployee)} className="btn-secondary w-full justify-center">
-                <MdPrint size={16} className="text-[#8DC63F]" />
-                Imprimir Credencial
-              </button>
             </div>
           </div>
         </div>

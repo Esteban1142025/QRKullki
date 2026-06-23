@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Swal from 'sweetalert2';
 import {
   MdPerson, MdSave, MdCheckCircle, MdWarning, MdLock,
-  MdEmail, MdBadge, MdVpnKey,
+  MdEmail, MdBadge, MdVpnKey, MdQrCode2, MdRefresh, MdTimer,
 } from 'react-icons/md';
+import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../services/api/apiClient';
+import { generateQRToken, getTimeoutMs, getWindowEnd } from '../utils/qrToken';
 
 const Profile = () => {
   const { user } = useAuth();
@@ -16,6 +18,70 @@ const Profile = () => {
     user?.role === 'talento_humano' ||
     perms.includes('all') ||
     perms.includes('gestionar_usuarios');
+
+  const idEmpleado = parseInt(user?.id?.replace('KW-', '') || '0', 10);
+
+  // ── QR dinámico sincronizado ─────────────────────────
+  const [dynamicToken, setDynamicToken]         = useState('');
+  const [tokenSecondsLeft, setTokenSecondsLeft] = useState(0);
+  const [isExpired, setIsExpired]               = useState(false);
+  const totalSecondsRef                         = useRef(0);
+  const rotateRef                               = useRef(null);
+  const countdownRef                            = useRef(null);
+
+  const clearTimers = () => {
+    clearTimeout(rotateRef.current);
+    clearInterval(countdownRef.current);
+  };
+
+  // Arranca el QR de la ventana actual. El token es determinístico: misma ventana = mismo token.
+  const startQR = useCallback(() => {
+    clearTimers();
+    const timeoutMs  = getTimeoutMs();
+    const windowEnd  = getWindowEnd();
+    const token      = generateQRToken(idEmpleado);
+
+    totalSecondsRef.current = Math.round(timeoutMs / 1000);
+    setDynamicToken(token);
+    setIsExpired(false);
+    setTokenSecondsLeft(Math.max(0, Math.round((windowEnd - Date.now()) / 1000)));
+
+    // Al vencer la ventana: mostrar estado expirado (el empleado decide cuándo renovar)
+    rotateRef.current = setTimeout(() => {
+      clearTimers();
+      setIsExpired(true);
+      setTokenSecondsLeft(0);
+    }, Math.max(0, windowEnd - Date.now()));
+
+    countdownRef.current = setInterval(() => {
+      const rem = Math.max(0, Math.round((windowEnd - Date.now()) / 1000));
+      setTokenSecondsLeft(rem);
+    }, 1000);
+  }, [idEmpleado]);
+
+  useEffect(() => {
+    if (!idEmpleado) return;
+    startQR();
+    const onConfigChanged = () => startQR();
+    window.addEventListener('kw:config-changed', onConfigChanged);
+    return () => {
+      clearTimers();
+      window.removeEventListener('kw:config-changed', onConfigChanged);
+    };
+  }, [idEmpleado]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const pct = totalSecondsRef.current > 0
+    ? Math.max(0, (tokenSecondsLeft / totalSecondsRef.current) * 100)
+    : 0;
+  const barColor = pct > 50 ? 'bg-[#84cc16]' : pct > 20 ? 'bg-orange-400' : 'bg-red-500';
+
+  const fmtTime = (s) => {
+    const h   = Math.floor(s / 3600);
+    const m   = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+    return `${m}:${String(sec).padStart(2, '0')}`;
+  };
 
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -241,6 +307,62 @@ const Profile = () => {
               </div>
             ))}
           </div>
+
+          {/* QR credencial dinámica */}
+          {idEmpleado > 0 && (
+            <div className="card-corporate p-5 flex flex-col items-center gap-3">
+              <h4 className="w-full text-xs font-black text-slate-600 uppercase tracking-wider border-b border-slate-200 pb-3 flex items-center gap-2">
+                <MdQrCode2 size={15} className="text-[#84cc16]" /> Mi Credencial QR
+              </h4>
+
+              {isExpired ? (
+                /* ── Estado expirado ── */
+                <div className="flex flex-col items-center gap-3 py-3 text-center">
+                  <div className="w-28 h-28 rounded-xl bg-slate-100 border-2 border-dashed border-red-300 flex flex-col items-center justify-center gap-1.5">
+                    <MdTimer size={30} className="text-red-400" />
+                    <p className="text-[9px] text-red-500 font-bold uppercase tracking-wider">QR Expirado</p>
+                  </div>
+                  <p className="text-xs text-slate-500 leading-relaxed max-w-[180px]">
+                    Tu credencial ha vencido. Genera una nueva para acceder a las áreas autorizadas.
+                  </p>
+                  <button
+                    onClick={startQR}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-[#84cc16] hover:bg-[#79ac34] text-white text-xs font-bold rounded-lg transition-colors shadow-sm cursor-pointer"
+                  >
+                    <MdRefresh size={15} /> Renovar QR
+                  </button>
+                </div>
+              ) : (
+                /* ── QR activo ── */
+                <>
+                  <div className="relative p-2.5 bg-white rounded-xl shadow-md border border-slate-100">
+                    <QRCodeSVG value={dynamicToken || 'KW-NO-QR'} size={140} fgColor="#1e293b" level="H" />
+                    <div className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[8px] font-mono font-bold px-2 py-0.5 rounded-full whitespace-nowrap shadow">
+                      Válido por {fmtTime(tokenSecondsLeft)}
+                    </div>
+                  </div>
+
+                  {/* Barra de vida */}
+                  <div className="w-full mt-2 space-y-1">
+                    <div className="flex justify-between text-[9px] text-slate-400 font-mono">
+                      <span>Tiempo restante</span>
+                      <span className={pct <= 20 ? 'text-red-500 font-bold' : ''}>{fmtTime(tokenSecondsLeft)}</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-1000 ${barColor}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <p className="text-[9px] text-slate-400 text-center leading-relaxed">
+                    Presenta este código en los lectores QR de las áreas a las que tienes acceso.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
 
         </div>
       </div>

@@ -133,7 +133,11 @@ const Settings = () => {
       return;
     }
     try {
+      const prev = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
       localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...config, sessionTimeout: String(timeout), logRetention: String(retention) }));
+      if (prev.sessionTimeout !== String(timeout)) {
+        window.dispatchEvent(new CustomEvent('kw:config-changed', { detail: { sessionTimeout: timeout } }));
+      }
       Swal.fire({
         icon: 'success', title: 'Configuración Guardada',
         text: 'Los parámetros han sido actualizados correctamente.',

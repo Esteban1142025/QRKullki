@@ -7,6 +7,7 @@ import {
   MdQrCodeScanner, MdCheckCircle, MdCancel, MdDevices,
   MdArrowForward, MdPlayCircleFilled, MdWifiTethering, MdRefresh
 } from 'react-icons/md';
+import { generateQRToken, parseQRToken } from '../utils/qrToken';
 
 const QRScanner = () => {
   const { user } = useAuth();
@@ -94,7 +95,24 @@ const QRScanner = () => {
       return;
     }
 
-    const emp = preFoundEmp || employees.find(e => e.qrCode === qrString);
+    let emp = preFoundEmp;
+    if (!emp) {
+      const parsed = parseQRToken(qrString);
+      if (parsed) {
+        if (parsed.tampered) {
+          record(false, 'QR inválido: firma digital no coincide (posible falsificación o manipulación).', null, qrString);
+          return;
+        }
+        if (parsed.expired) {
+          const expiredEmp = employees.find(e => e.id_empleado === parsed.id_empleado);
+          record(false, 'Credencial QR expirada. El colaborador debe renovar su código de acceso.', expiredEmp || null, qrString);
+          return;
+        }
+        emp = employees.find(e => e.id_empleado === parsed.id_empleado);
+      } else {
+        emp = employees.find(e => e.qrCode === qrString);
+      }
+    }
 
     if (!emp) {
       record(false, 'Código QR no registrado en la institución.', null, qrString);
@@ -154,7 +172,10 @@ const QRScanner = () => {
 
   const handleScanEmployee = () => {
     const emp = employees.find(e => e.id === selectedEmpId);
-    if (emp) { setScannedQR(emp.qrCode); validate(emp.qrCode, emp); }
+    if (!emp) return;
+    const token = generateQRToken(emp.id_empleado);
+    setScannedQR(token);
+    validate(token, emp);
   };
 
   const reset = () => { setValidationResult(null); setScannedQR(''); };
