@@ -384,7 +384,7 @@ ul{padding-left:16px;margin-top:4px}li{font-size:11px;margin-bottom:5px;line-hei
 
         <div className="card-corporate p-5 flex items-center justify-between">
           <div className="space-y-1.5">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block font-mono">Puntuación Compliance</span>
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block font-mono">Accesos Autorizados</span>
             <div className={`text-2xl font-black font-['Outfit'] ${compColor}`}>
               {dashData ? `${kpis.compliance_score}%` : '—'}
             </div>

@@ -132,13 +132,8 @@ const Settings = () => {
       Swal.fire({ icon: 'warning', title: 'Valor inválido', text: 'La retención de bitácoras debe estar entre 1 y 3650 días.', background: '#ffffff', color: '#1e293b' });
       return;
     }
-    const endpoint = config.apiEndpoint.trim();
-    if (!endpoint || !/^https?:\/\/.+/.test(endpoint)) {
-      Swal.fire({ icon: 'warning', title: 'URL inválida', text: 'El endpoint debe ser una URL válida que comience con http:// o https://.', background: '#ffffff', color: '#1e293b' });
-      return;
-    }
     try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...config, sessionTimeout: String(timeout), logRetention: String(retention), apiEndpoint: endpoint }));
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...config, sessionTimeout: String(timeout), logRetention: String(retention) }));
       Swal.fire({
         icon: 'success', title: 'Configuración Guardada',
         text: 'Los parámetros han sido actualizados correctamente.',
@@ -178,13 +173,6 @@ const Settings = () => {
                 <input type="number" value={config.logRetention} min="1" max="3650"
                   onChange={e => setConfig({ ...config, logRetention: e.target.value })} className="form-input w-full" />
                 <p className="text-[10px] text-slate-400">Entre 1 y 3650 días (máx. 10 años)</p>
-              </div>
-              <div className="space-y-1.5 sm:col-span-2">
-                <label className="form-label">Endpoint API Backend</label>
-                <input type="url" value={config.apiEndpoint}
-                  onChange={e => setConfig({ ...config, apiEndpoint: e.target.value })} className="form-input w-full font-mono"
-                  placeholder="http://localhost:3001" />
-                <p className="text-[10px] text-slate-400">Debe comenzar con http:// o https://</p>
               </div>
             </div>
 
@@ -245,11 +233,6 @@ const Settings = () => {
             </div>
           </div>
 
-          <div className="p-4 rounded-xl border border-[#84cc16]/30 bg-[#84cc16]/10 text-sm text-slate-700 leading-relaxed shadow-sm font-medium">
-            <strong className="text-[#65a30d] font-black">Entorno:</strong>{' '}
-            <code className="bg-white px-2 py-0.5 rounded border border-[#84cc16]/40 text-[#65a30d] text-xs">PRODUCCIÓN</code>
-            <p className="text-xs text-slate-500 mt-2">Los cambios afectan inmediatamente el comportamiento del sistema.</p>
-          </div>
 
         </div>
       </div>
