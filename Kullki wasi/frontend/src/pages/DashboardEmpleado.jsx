@@ -35,7 +35,7 @@ const DashboardEmpleado = () => {
             </h2>
             <p className="text-xs text-slate-500 mt-1.5 max-w-xl leading-relaxed">
               Bienvenido, <strong className="text-slate-700">{user?.name}</strong>. Aquí puedes visualizar las áreas a las que estás autorizado ingresar en{' '}
-              <strong className="text-[#79ac34]">{user?.agencyDisplayName || user?.agencyName || (user?.agency === 'MAT' ? 'Matriz Ambato' : user?.agency)}</strong>.
+              <strong className="text-[#79ac34]">{user?.agencyDisplayName || user?.agencyName || user?.agency}</strong>.
             </p>
           </div>
           <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-slate-200 shrink-0 shadow-sm">

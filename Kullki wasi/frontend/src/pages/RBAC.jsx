@@ -123,7 +123,7 @@ const RBAC = () => {
       },
       ...items,
     ];
-  }, [areas]);
+  }, [agencyAreas]);
 
   // IDs reales de permisos de área para la agencia activa (excluye __all_areas__)
   const dynamicRealAreaIds = useMemo(

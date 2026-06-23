@@ -285,7 +285,7 @@ const Employees = () => {
       return;
     }
 
-    const parts = form.name.trim().split(' ');
+    const parts = form.name.trim().split(/\s+/);
     const nombres = parts[0];
     const apellidos = parts.slice(1).join(' ') || parts[0];
 
@@ -448,7 +448,7 @@ const Employees = () => {
                       </span>
                     </td>
                     <td className="text-slate-600">
-                      {emp.agency === 'MAT' ? 'Matriz' : emp.agencyName || emp.agency}
+                      {emp.agencyName || emp.agency}
                     </td>
                     <td>
                       <span className={`badge ${emp.status === 'Activo' ? 'badge-active' : 'badge-inactive'}`}>

@@ -229,7 +229,7 @@ const Profile = () => {
             </h4>
             {[
               ['Rol',     user?.roleName || '—',                                                          MdVpnKey],
-              ['Agencia', user?.agency === 'MAT' ? 'Casa Matriz — Ambato' : `Sucursal ${user?.agency}`,  MdBadge ],
+              ['Agencia', user?.agencyName || user?.agency || '—',                                        MdBadge ],
               ['Correo',  user?.email || '—',                                                             MdEmail ],
             ].map(([label, val, Icon]) => (
               <div key={label} className="flex items-start gap-2.5">

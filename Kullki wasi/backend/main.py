@@ -22,7 +22,7 @@ def utc_iso(dt):
 
 SECRET_KEY = "kullki-wasi-super-secret-jwt-key"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 15
+ACCESS_TOKEN_EXPIRE_MINUTES = 480
 
 ROLE_DEPARTMENTS = {
     "admin": "Administración General",
@@ -532,7 +532,7 @@ async def restaurar_backup_upload(file: UploadFile = File(...), db: Session = De
         db.flush()
 
         for a in data.get("areas_restringidas", []):
-            db.add(models.AreaRestringida(id_area=a["id_area"], id_agencia=a.get("id_agencia"), nombre=a["nombre"], nivel_riesgo=a["nivel_riesgo"], id_permiso_requerido=a.get("id_permiso_requerido"), estado=a.get("estado",True), horario=a.get("horario","08:00-18:00")))
+            db.add(models.AreaRestringida(id_area=a["id_area"], id_agencia=a.get("id_agencia"), nombre=a["nombre"], nivel_riesgo=a["nivel_riesgo"], id_permiso_requerido=a.get("id_permiso_requerido"), estado=a.get("estado",True), horario=a.get("horario","08:00 - 18:00")))
         db.flush()
 
         for d in data.get("dispositivos", []):
@@ -1097,11 +1097,11 @@ def listar_dispositivos(db: Session = Depends(get_db)):
     for d in devs:
         area_nombre = d.area.nombre if d.area else "Sin área"
         # Derivar agencia del área
-        agency = "MAT"
+        agency = None
         if d.area and d.area.id_agencia:
             ag = db.query(models.Agencia).filter(models.Agencia.id_agencia == d.area.id_agencia).first()
             if ag:
-                agency = ag.codigo or "MAT"
+                agency = ag.codigo or None
         result.append({
             "id": f"DEV-{d.id_dispositivo:02d}",
             "id_dispositivo": d.id_dispositivo,
