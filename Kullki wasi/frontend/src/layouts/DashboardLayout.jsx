@@ -40,7 +40,7 @@ const MENU_ITEMS = [
   { label: 'Eventos',           path: '/events',           icon: MdEventNote,     roles: ['admin'],                                                    permission: 'all'             },
   { label: 'Agencias',          path: '/agencies',         icon: MdStore,         roles: ['admin', 'jefe_agencia'],                                    permission: null              },
   { label: 'Mi Perfil',         path: '/profile',          icon: MdPerson,        roles: [],                                                           permission: null              },
-  { label: 'Configuración',     path: '/settings',         icon: MdSettings,      roles: ['admin'],                                                    permission: 'all'             },
+  { label: 'Configuración',     path: '/settings',         icon: MdSettings,      roles: ['admin', 'talento_humano'],                                  permission: 'all'             },
 ];
 
 const DashboardLayout = () => {

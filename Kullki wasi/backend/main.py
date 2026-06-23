@@ -110,11 +110,27 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Error interno del servidor", "message": str(exc)},
     )
 
+DEFAULT_DEPARTMENTS = [
+    "Tecnología e Información", "Talento Humano", "Gestión de Riesgos",
+    "Seguridad y Vigilancia", "Auditoría Interna", "Operaciones Financieras",
+    "Caja y Servicios", "Negocios y Microcrédito", "Administración General",
+]
+
 @app.on_event("startup")
 def startup_event():
     try:
         models.Base.metadata.create_all(bind=database.engine)
         print("Tablas de Base de Datos inicializadas.")
+        db = database.SessionLocal()
+        try:
+            count = db.query(models.Departamento).count()
+            if count == 0:
+                for nombre in DEFAULT_DEPARTMENTS:
+                    db.add(models.Departamento(nombre=nombre, activo=True))
+                db.commit()
+                print(f"Departamentos iniciales creados: {len(DEFAULT_DEPARTMENTS)}")
+        finally:
+            db.close()
     except Exception as e:
         print(f"Advertencia: No se pudo conectar a la Base de Datos. Detalle: {e}")
 
@@ -126,6 +142,18 @@ def get_db():
         db.close()
 
 _http_bearer = HTTPBearer(auto_error=False)
+
+def require_admin_or_th(credentials: HTTPAuthorizationCredentials = Depends(_http_bearer)):
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Token requerido")
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        roles = payload.get("roles", [])
+    except Exception:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
+    if not any(r in roles for r in ("admin", "talento_humano")):
+        raise HTTPException(status_code=403, detail="Acceso restringido a administradores o talento humano")
+    return roles
 
 def require_admin(credentials: HTTPAuthorizationCredentials = Depends(_http_bearer)):
     if not credentials:
@@ -873,6 +901,81 @@ def actualizar_rol(id_rol: int, data: dict, db: Session = Depends(get_db)):
         "name": rol.nombre,
         "permissions": [p.codigo_permiso for p in rol.permisos]
     }
+
+# Roles de sistema que no se pueden eliminar
+SYSTEM_ROLES = {"admin","talento_humano","riesgos","seguridad_fisica","auditor","jefe_agencia","tecnico_ti","empleado"}
+
+@app.post("/api/v1/roles")
+def crear_rol(data: dict, db: Session = Depends(get_db)):
+    nombre = (data.get("nombre") or "").strip().lower().replace(" ", "_")
+    descripcion = (data.get("descripcion") or "").strip()
+    if not nombre:
+        raise HTTPException(status_code=422, detail="El nombre del rol es requerido.")
+    if nombre in SYSTEM_ROLES:
+        raise HTTPException(status_code=409, detail="Ese nombre corresponde a un rol de sistema y no puede reutilizarse.")
+    exists = db.query(models.Rol).filter(models.Rol.nombre == nombre).first()
+    if exists:
+        raise HTTPException(status_code=409, detail=f"Ya existe un rol con el nombre '{nombre}'.")
+    nuevo = models.Rol(nombre=nombre, descripcion=descripcion or f"Rol personalizado: {nombre}", activo=True)
+    db.add(nuevo)
+    db.commit()
+    db.refresh(nuevo)
+    return {"id": nuevo.id_rol, "name": nuevo.nombre, "description": nuevo.descripcion, "permissions": []}
+
+@app.delete("/api/v1/roles/{id_rol}")
+def eliminar_rol(id_rol: int, db: Session = Depends(get_db)):
+    rol = db.query(models.Rol).filter(models.Rol.id_rol == id_rol).first()
+    if not rol:
+        raise HTTPException(status_code=404, detail="Rol no encontrado.")
+    if rol.nombre in SYSTEM_ROLES:
+        raise HTTPException(status_code=403, detail="Los roles de sistema no pueden eliminarse.")
+    en_uso = db.query(models.Empleado).filter(
+        models.Empleado.roles.any(models.Rol.id_rol == id_rol)
+    ).first()
+    if en_uso:
+        raise HTTPException(status_code=409, detail="No se puede eliminar: hay colaboradores con este rol asignado.")
+    db.delete(rol)
+    db.commit()
+    return {"detail": f"Rol '{rol.nombre}' eliminado correctamente."}
+
+# --- Departamentos ---
+
+@app.get("/api/v1/departamentos")
+def get_departamentos(db: Session = Depends(get_db), _=Depends(require_admin_or_th)):
+    return [
+        {"id": d.id_departamento, "nombre": d.nombre}
+        for d in db.query(models.Departamento)
+            .filter(models.Departamento.activo == True)
+            .order_by(models.Departamento.nombre)
+    ]
+
+@app.post("/api/v1/departamentos")
+def crear_departamento(data: dict, db: Session = Depends(get_db), _=Depends(require_admin_or_th)):
+    nombre = (data.get("nombre") or "").strip()
+    if not nombre:
+        raise HTTPException(status_code=422, detail="El nombre del departamento es requerido.")
+    existe = db.query(models.Departamento).filter(
+        models.Departamento.nombre.ilike(nombre), models.Departamento.activo == True
+    ).first()
+    if existe:
+        raise HTTPException(status_code=409, detail=f"Ya existe el departamento '{nombre}'.")
+    nuevo = models.Departamento(nombre=nombre, activo=True)
+    db.add(nuevo)
+    db.commit()
+    db.refresh(nuevo)
+    return {"id": nuevo.id_departamento, "nombre": nuevo.nombre}
+
+@app.delete("/api/v1/departamentos/{id_departamento}")
+def eliminar_departamento(id_departamento: int, db: Session = Depends(get_db), _=Depends(require_admin)):
+    dept = db.query(models.Departamento).filter(models.Departamento.id_departamento == id_departamento).first()
+    if not dept or not dept.activo:
+        raise HTTPException(status_code=404, detail="Departamento no encontrado.")
+    en_uso = db.query(models.Empleado).filter(models.Empleado.departamento == dept.nombre).first()
+    if en_uso:
+        raise HTTPException(status_code=409, detail="No se puede eliminar: hay colaboradores asignados a este departamento.")
+    dept.activo = False
+    db.commit()
+    return {"detail": f"Departamento '{dept.nombre}' eliminado correctamente."}
 
 # --- Dashboard de Auditoría ---
 

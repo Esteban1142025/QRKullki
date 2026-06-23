@@ -29,7 +29,7 @@ const parseApiError = (err) => {
   return JSON.stringify(detail);
 };
 
-const DEPARTMENTS = [
+const DEFAULT_DEPARTMENTS = [
   'Tecnología e Información', 'Talento Humano', 'Gestión de Riesgos',
   'Seguridad y Vigilancia', 'Auditoría Interna', 'Operaciones Financieras',
   'Caja y Servicios', 'Negocios y Microcrédito', 'Administración General',
@@ -43,10 +43,11 @@ const BLANK_FORM = {
 
 const Employees = () => {
   const { user } = useAuth();
-  const [employees, setEmployees] = useState([]);
-  const [agencies, setAgencies] = useState([]);
-  const [roles, setRoles] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [employees, setEmployees]   = useState([]);
+  const [agencies, setAgencies]     = useState([]);
+  const [roles, setRoles]           = useState([]);
+  const [departments, setDepartments] = useState(DEFAULT_DEPARTMENTS);
+  const [loading, setLoading]       = useState(true);
 
   const [search, setSearch]           = useState('');
   const [filterDept, setFilterDept]   = useState('ALL');
@@ -217,14 +218,18 @@ const Employees = () => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [empRes, agRes, rolRes] = await Promise.all([
+      const [empRes, agRes, rolRes, deptRes] = await Promise.all([
         apiClient.get('/empleados'),
         apiClient.get('/agencias'),
         apiClient.get('/roles'),
+        apiClient.get('/departamentos').catch(() => null),
       ]);
       setEmployees(empRes.data);
       setAgencies(agRes.data);
       setRoles(rolRes.data);
+      if (deptRes?.data?.length) {
+        setDepartments(deptRes.data.map(d => d.nombre));
+      }
     } catch (err) {
       console.error('Error al cargar datos:', err);
       fireSwal({ icon: 'error', title: 'Error de conexión', text: 'No se pudo cargar la información desde el servidor.' });
@@ -250,8 +255,6 @@ const Employees = () => {
       && (filterDept   === 'ALL' || e.department === filterDept)
       && (filterStatus === 'ALL' || e.status === filterStatus);
   });
-
-  const departments = [...new Set(employees.map(e => e.department).filter(Boolean))];
 
   const openAdd = () => {
     setForm({ ...BLANK_FORM, hireDate: new Date().toISOString().split('T')[0] });
@@ -562,7 +565,7 @@ const Employees = () => {
                 <div className="space-y-1">
                   <label className="form-label">Departamento</label>
                   <select value={form.department} onChange={e => field('department', e.target.value)} className="form-input">
-                    {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">

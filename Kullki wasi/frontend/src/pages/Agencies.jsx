@@ -3,18 +3,39 @@ import apiClient from '../services/api/apiClient';
 import Swal from 'sweetalert2';
 import { MdStore, MdLocationOn, MdPhone, MdAdd, MdEdit, MdDelete, MdClose, MdSave, MdRefresh } from 'react-icons/md';
 
+// Cuenta alertas abiertas por código de agencia y devuelve el nivel operativo
+const getAlertLevel = (agencyCode, alertCounts) => {
+  const count = alertCounts[agencyCode] ?? 0;
+  if (count === 0)  return { text: 'Normal',   count, color: 'bg-emerald-500 shadow-emerald-500/40 text-emerald-950', ping: 'bg-emerald-400', badge: 'bg-emerald-100 text-emerald-700 border-emerald-300' };
+  if (count < 10)   return { text: 'Alerta',   count, color: 'bg-amber-500 shadow-amber-500/40 text-amber-950',       ping: 'bg-amber-400',   badge: 'bg-amber-100 text-amber-700 border-amber-300'   };
+  return             { text: 'Crítico',  count, color: 'bg-red-500 shadow-red-500/40 text-red-950',             ping: 'bg-red-400',     badge: 'bg-red-100 text-red-700 border-red-300'         };
+};
+
 const Agencies = () => {
-  const [agencies, setAgencies] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState(null);
+  const [agencies, setAgencies]       = useState([]);
+  const [alertCounts, setAlertCounts] = useState({});
+  const [loading, setLoading]         = useState(true);
+  const [showForm, setShowForm]       = useState(false);
+  const [editing, setEditing]         = useState(null);
   const [form, setForm] = useState({ id: '', id_agencia: null, name: '', address: '', phone: '', type: 'Sucursal', status: 'Activo' });
 
   const fetchAgencies = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get('/agencias');
-      setAgencies(res.data);
+      const [agRes, alertRes] = await Promise.all([
+        apiClient.get('/agencias'),
+        apiClient.get('/security/alerts').catch(() => ({ data: [] })),
+      ]);
+      setAgencies(agRes.data);
+
+      // Contar solo alertas abiertas (no resueltas) por agencia
+      const counts = {};
+      alertRes.data.forEach(a => {
+        if (!a.isResolved && a.agency) {
+          counts[a.agency] = (counts[a.agency] ?? 0) + 1;
+        }
+      });
+      setAlertCounts(counts);
     } catch (err) {
       console.error('Error al cargar agencias:', err);
     } finally {
@@ -138,21 +159,22 @@ const Agencies = () => {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 relative z-10">
           {agencies.map(agency => {
             const active = agency.status === 'Activo';
-            const statusColor = active ? 'bg-emerald-500 shadow-emerald-500/40 text-emerald-950' : 'bg-slate-600 shadow-slate-600/40 text-slate-100';
-            const pingColor = active ? 'bg-emerald-400' : 'bg-slate-500';
-            const statusText = active ? 'Normal' : 'Desconectado';
+            const level  = active ? getAlertLevel(agency.id, alertCounts) : null;
+            const tileColor = active ? level.color : 'bg-slate-600 shadow-slate-600/40 text-slate-100';
+            const ping      = active ? level.ping  : 'bg-slate-500';
+            const label     = active ? level.text  : 'Desconectado';
             return (
-              <div key={agency.id} className={`${statusColor} rounded-xl p-3 shadow-lg flex flex-col justify-between aspect-video transition-all`}>
+              <div key={agency.id} className={`${tileColor} rounded-xl p-3 shadow-lg flex flex-col justify-between aspect-video transition-all`}>
                 <div className="flex justify-between items-start">
                   <span className="text-[10px] font-black uppercase tracking-widest opacity-80">{agency.id}</span>
                   <span className="relative flex h-2 w-2">
-                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${pingColor}`}></span>
-                    <span className={`relative inline-flex rounded-full h-2 w-2 ${pingColor}`}></span>
+                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${ping}`}></span>
+                    <span className={`relative inline-flex rounded-full h-2 w-2 ${ping}`}></span>
                   </span>
                 </div>
                 <div>
                   <p className="font-bold text-xs truncate" title={agency.name}>{agency.name}</p>
-                  <p className="text-[9px] font-bold uppercase mt-0.5 opacity-80">{statusText}</p>
+                  <p className="text-[9px] font-bold uppercase mt-0.5 opacity-80">{label}{active && level.count > 0 ? ` (${level.count})` : ''}</p>
                 </div>
               </div>
             );
@@ -161,7 +183,10 @@ const Agencies = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {agencies.map(agency => (
+        {agencies.map(agency => {
+          const active = agency.status === 'Activo';
+          const level  = active ? getAlertLevel(agency.id, alertCounts) : null;
+          return (
           <div key={agency.id} className="card-corporate p-6 flex flex-col justify-between h-full group hover:-translate-y-1 transition-transform duration-300">
             <div className="mb-4">
               <div className="flex items-start justify-between mb-4">
@@ -174,6 +199,11 @@ const Agencies = () => {
                     <span className="text-[11px] text-[#65a30d] font-bold tracking-widest uppercase bg-[#84cc16]/10 px-2 py-0.5 rounded border border-[#84cc16]/20">{agency.id}</span>
                   </div>
                 </div>
+                {active && level.count > 0 && (
+                  <span className={`text-[10px] font-bold px-2 py-1 rounded-lg border uppercase tracking-wider ${level.badge}`}>
+                    {level.count} {level.count === 1 ? 'alerta' : 'alertas'}
+                  </span>
+                )}
               </div>
               <div className="space-y-3 mt-5 text-sm">
                 {agency.address && (
@@ -193,10 +223,12 @@ const Agencies = () => {
             <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-auto">
               <div className="flex items-center gap-2">
                 <span className="relative flex h-3 w-3">
-                  <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${agency.status === 'Activo' ? 'bg-emerald-500 animate-ping' : 'bg-red-500'}`}></span>
-                  <span className={`relative inline-flex rounded-full h-3 w-3 ${agency.status === 'Activo' ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+                  <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${active ? `${level.ping} animate-ping` : 'bg-red-500'}`}></span>
+                  <span className={`relative inline-flex rounded-full h-3 w-3 ${active ? level.ping : 'bg-red-500'}`}></span>
                 </span>
-                <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">{agency.status}</span>
+                <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  {active ? level.text : agency.status}
+                </span>
               </div>
               <div className="flex gap-2">
                 <button onClick={() => openEdit(agency)} className="btn-icon">
@@ -208,7 +240,8 @@ const Agencies = () => {
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {showForm && (

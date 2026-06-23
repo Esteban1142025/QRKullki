@@ -4,7 +4,8 @@ import apiClient from '../services/api/apiClient';
 import Swal from 'sweetalert2';
 import {
   MdSecurity, MdCheckCircle, MdCancel, MdSave, MdInfoOutline,
-  MdLockOpen, MdShield, MdRefresh, MdApps, MdDoorFront
+  MdLockOpen, MdShield, MdRefresh, MdApps, MdDoorFront,
+  MdAdd, MdDelete, MdClose
 } from 'react-icons/md';
 import { logPermissionChanges } from '../utils/eventLogger';
 
@@ -82,6 +83,8 @@ const RISK_LABELS = {
   Bajo:    { style: 'text-emerald-700 bg-emerald-100 border-emerald-200', dot: 'bg-emerald-500' },
 };
 
+const SYSTEM_ROLES = new Set(['admin','talento_humano','riesgos','seguridad_fisica','auditor','jefe_agencia','tecnico_ti','empleado']);
+
 const RBAC = () => {
   const { user } = useAuth();
   const [rolesData, setRolesData]       = useState({});
@@ -90,6 +93,11 @@ const RBAC = () => {
   const [activeTab, setActiveTab]       = useState('modulos');
   const [loading, setLoading]           = useState(true);
   const [saving, setSaving]             = useState(false);
+
+  // Estado para modal de nuevo rol
+  const [showNewRole, setShowNewRole]   = useState(false);
+  const [newRoleForm, setNewRoleForm]   = useState({ nombre: '', descripcion: '' });
+  const [creatingRole, setCreatingRole] = useState(false);
 
   const originalPermsRef = useRef({});
 
@@ -196,6 +204,52 @@ const RBAC = () => {
       ...prev,
       [roleId]: { ...prev[roleId], permissions: perms },
     }));
+  };
+
+  const handleCreateRole = async (e) => {
+    e.preventDefault();
+    const nombre = newRoleForm.nombre.trim().toLowerCase().replace(/\s+/g, '_');
+    if (!nombre) return;
+    setCreatingRole(true);
+    try {
+      const res = await apiClient.post('/roles', { nombre, descripcion: newRoleForm.descripcion.trim() });
+      await loadRoles();
+      setActiveRoleId(res.data.name);
+      setShowNewRole(false);
+      setNewRoleForm({ nombre: '', descripcion: '' });
+      Swal.fire({
+        icon: 'success', title: 'Rol Creado',
+        html: `<p style="font-size:13px;color:#475569">El rol <strong>${res.data.name}</strong> fue creado. Ahora puedes asignarle permisos y utilizarlo en los expedientes de colaboradores.</p>`,
+        confirmButtonColor: '#84cc16', background: '#ffffff', color: '#1e293b',
+      });
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.response?.data?.detail || 'No se pudo crear el rol.', background: '#ffffff', color: '#1e293b' });
+    } finally {
+      setCreatingRole(false);
+    }
+  };
+
+  const handleDeleteRole = async (roleId) => {
+    const role = rolesData[roleId];
+    if (!role) return;
+    const confirm = await Swal.fire({
+      icon: 'warning',
+      title: `¿Eliminar rol "${role.name}"?`,
+      html: `<p style="font-size:13px;color:#475569">Esta acción es irreversible. Solo se puede eliminar si ningún colaborador tiene este rol asignado.</p>`,
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar', cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#ef4444', cancelButtonColor: '#334155',
+      background: '#ffffff', color: '#1e293b',
+    });
+    if (!confirm.isConfirmed) return;
+    try {
+      await apiClient.delete(`/roles/${role.id_rol}`);
+      setActiveRoleId('admin');
+      await loadRoles();
+      Swal.fire({ icon: 'success', title: 'Rol eliminado', timer: 1500, showConfirmButton: false, background: '#ffffff', color: '#1e293b' });
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'No se pudo eliminar', text: err.response?.data?.detail || 'Error al eliminar el rol.', background: '#ffffff', color: '#1e293b' });
+    }
   };
 
   const handleSave = async () => {
@@ -310,15 +364,23 @@ const RBAC = () => {
         </div>
       </div>
 
-      {/* Info banner */}
-      <div className="flex items-start gap-3 p-4 rounded-xl bg-[#84cc16]/10 border border-[#84cc16]/30 shadow-sm">
-        <MdInfoOutline size={20} className="text-[#65a30d] shrink-0 mt-0.5" />
-        <p className="text-sm text-slate-700 leading-relaxed font-medium">
-          <strong className="text-slate-900">Cambios persistentes.</strong>{' '}
-          Los permisos se guardan en la base de datos y se aplican en el próximo inicio de sesión del colaborador.
-          Los <strong>permisos de módulo</strong> controlan qué secciones del panel puede ver cada rol.
-          Los <strong>permisos de área</strong> controlan el acceso físico validado por el escáner QR.
-        </p>
+      {/* Crear nuevo rol */}
+      <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-[#84cc16]/15 border border-[#84cc16]/30 flex items-center justify-center shrink-0">
+            <MdAdd size={20} className="text-[#65a30d]" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-slate-800">Roles personalizados</p>
+            <p className="text-xs text-slate-500">Crea roles adicionales y asígnalos a colaboradores desde el módulo de Colaboradores.</p>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowNewRole(true)}
+          className="flex items-center gap-2 px-4 py-2.5 bg-[#84cc16] hover:bg-[#79ac34] rounded-xl text-sm font-bold text-white tracking-wider transition-all cursor-pointer shadow shrink-0"
+        >
+          <MdAdd size={16} /> Crear Rol
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -349,11 +411,22 @@ const RBAC = () => {
                     <span className={`font-black text-sm font-['Outfit'] ${active ? 'text-[#65a30d]' : 'text-slate-700'}`}>
                       {role.name}
                     </span>
-                    <span className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded shrink-0 ${
-                      active ? 'bg-[#84cc16]/20 text-[#65a30d]' : 'bg-slate-200 text-slate-600'
-                    }`}>
-                      {role.id}
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded ${
+                        active ? 'bg-[#84cc16]/20 text-[#65a30d]' : 'bg-slate-200 text-slate-600'
+                      }`}>
+                        {role.id}
+                      </span>
+                      {!SYSTEM_ROLES.has(role.id) && (
+                        <button
+                          onClick={ev => { ev.stopPropagation(); handleDeleteRole(role.id); }}
+                          className="p-1 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                          title="Eliminar rol"
+                        >
+                          <MdDelete size={15} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <p className="text-xs text-slate-500 mt-1.5 leading-relaxed font-medium">{role.description}</p>
                   {roleSuperAdmin ? (
@@ -512,6 +585,63 @@ const RBAC = () => {
         </div>
 
       </div>
+
+      {/* ── MODAL: CREAR ROL ──────────────────────────── */}
+      {showNewRole && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+              <div className="flex items-center gap-2">
+                <MdAdd size={20} className="text-[#84cc16]" />
+                <span className="font-black text-slate-800 text-sm uppercase tracking-wider">Crear Nuevo Rol</span>
+              </div>
+              <button onClick={() => { setShowNewRole(false); setNewRoleForm({ nombre: '', descripcion: '' }); }} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                <MdClose size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateRole} className="p-6 space-y-5">
+              <div className="space-y-1.5">
+                <label className="form-label">Nombre del Rol <span className="text-red-400">*</span></label>
+                <input
+                  type="text"
+                  value={newRoleForm.nombre}
+                  onChange={e => setNewRoleForm(f => ({ ...f, nombre: e.target.value }))}
+                  className="form-input w-full"
+                  placeholder="ej: supervisor_ventas"
+                  required
+                  autoFocus
+                />
+                <p className="text-[10px] text-slate-400">Se convertirá a minúsculas con guiones bajos. Ej: "Supervisor Ventas" → <code className="bg-slate-100 px-1 rounded">supervisor_ventas</code></p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="form-label">Descripción</label>
+                <input
+                  type="text"
+                  value={newRoleForm.descripcion}
+                  onChange={e => setNewRoleForm(f => ({ ...f, descripcion: e.target.value }))}
+                  className="form-input w-full"
+                  placeholder="ej: Supervisión de operaciones de ventas"
+                />
+              </div>
+
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-700 font-medium">
+                Después de crear el rol, podrás asignarle permisos de módulos y áreas desde esta misma pantalla, y asignarlo a colaboradores desde el módulo de Colaboradores.
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => { setShowNewRole(false); setNewRoleForm({ nombre: '', descripcion: '' }); }} className="btn-secondary">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={creatingRole || !newRoleForm.nombre.trim()} className="btn-primary disabled:opacity-50">
+                  <MdAdd size={16} /> {creatingRole ? 'Creando…' : 'Crear Rol'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

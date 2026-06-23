@@ -117,6 +117,13 @@ class BitacoraAcceso(Base):
     area = relationship("AreaRestringida")
     dispositivo = relationship("DispositivoEscaneo")
 
+class Departamento(Base):
+    __tablename__ = "departamentos"
+
+    id_departamento = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    nombre = Column(String(100), unique=True, nullable=False)
+    activo = Column(Boolean, default=True)
+
 class AlertaSeguridad(Base):
     __tablename__ = "alertas_seguridad"
 
