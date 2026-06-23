@@ -193,6 +193,9 @@ const Employees = () => {
   // filterAgency === 'ALL' significa "seguir el contexto global"; cualquier otro valor es override manual.
   const effectiveAgency = filterAgency !== 'ALL' ? filterAgency : (user?.agency || 'ALL');
 
+  // Empleados sólo de la agencia activa (para KPIs)
+  const agencyEmployees = employees.filter(e => effectiveAgency === 'ALL' || e.agency === effectiveAgency);
+
   const filtered = employees.filter(e => {
     const q = search.toLowerCase();
     const matchQ = (e.name || '').toLowerCase().includes(q) ||
@@ -364,10 +367,10 @@ const Employees = () => {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          ['Total', employees.length, 'text-slate-800'],
-          ['Activos', employees.filter(e => e.status === 'Activo').length, 'text-emerald-600'],
-          ['Inactivos', employees.filter(e => e.status !== 'Activo').length, 'text-red-500'],
-          ['Agencias', new Set(employees.map(e => e.agency)).size, 'text-[#79ac34]'],
+          ['Total Agencia', agencyEmployees.length, 'text-slate-800'],
+          ['Activos', agencyEmployees.filter(e => e.status === 'Activo').length, 'text-emerald-600'],
+          ['Inactivos', agencyEmployees.filter(e => e.status !== 'Activo').length, 'text-red-500'],
+          ['Departamentos', new Set(agencyEmployees.map(e => e.department).filter(Boolean)).size, 'text-[#79ac34]'],
         ].map(([label, val, color]) => (
           <div key={label} className="card-corporate p-4 flex items-center gap-3">
             <MdPeople size={20} className="text-slate-500 shrink-0" />

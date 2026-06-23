@@ -61,6 +61,9 @@ const Logs = () => {
   // Derivar agencia efectiva directamente de user.agency para reactividad garantizada
   const effectiveAgency = filterAgency !== 'ALL' ? filterAgency : (user?.agency || 'ALL');
 
+  // Logs sólo de la agencia activa (para KPIs)
+  const agencyLogs = logs.filter(l => effectiveAgency === 'ALL' || l.agency === effectiveAgency);
+
   const filtered = logs.filter(l => {
     const q = search.toLowerCase();
     const matchQ = (l.name     || '').toLowerCase().includes(q) ||
@@ -250,10 +253,10 @@ const Logs = () => {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          ['Total Registros', logs.length, 'text-slate-800'],
-          ['Autorizados', logs.filter(l => l.status === 'Autorizado').length, 'text-emerald-600'],
-          ['Denegados', logs.filter(l => l.status === 'Denegado').length, 'text-red-600'],
-          ['Riesgo Alto', logs.filter(l => l.risk === 'Alto').length, 'text-orange-600'],
+          ['Total Registros', agencyLogs.length, 'text-slate-800'],
+          ['Autorizados', agencyLogs.filter(l => l.status === 'Autorizado').length, 'text-emerald-600'],
+          ['Denegados', agencyLogs.filter(l => l.status === 'Denegado').length, 'text-red-600'],
+          ['Riesgo Alto', agencyLogs.filter(l => l.risk === 'Alto').length, 'text-orange-600'],
         ].map(([label, val, color]) => (
           <div key={label} className="card-corporate p-4">
             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{label}</p>
