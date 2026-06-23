@@ -1,4 +1,4 @@
-# 🏦 Sistema de Control de Accesos — Kullki Wasi
+# Sistema de Control de Accesos — Kullki Wasi
 
 Sistema automatizado de control de accesos físicos y trazabilidad de personal para la Cooperativa de Ahorro y Crédito Kullki Wasi Ltda., desarrollado bajo normativa SEPS Segmento 1.
 
@@ -6,7 +6,7 @@ Sistema automatizado de control de accesos físicos y trazabilidad de personal p
 
 ---
 
-## 📁 Estructura del Proyecto
+## Estructura del Proyecto
 
 ```
 Kullki wasi/
@@ -31,7 +31,7 @@ Kullki wasi/
 
 ---
 
-## ✅ Requisitos Previos
+## Requisitos Previos
 
 Antes de comenzar, asegúrate de tener instalado:
 
@@ -41,11 +41,11 @@ Antes de comenzar, asegúrate de tener instalado:
 | Docker Compose    | 2.0+          | `docker compose version`         | Incluido en Docker Desktop                      |
 | Git               | 2.0+          | `git --version`                  | https://git-scm.com/downloads                   |
 
-> **⚠️ IMPORTANTE (Windows):** Docker Desktop debe estar **abierto y en ejecución** antes de ejecutar cualquier comando Docker. Verifica que el ícono de Docker aparezca en la barra de tareas y diga "Docker Desktop is running".
+> **IMPORTANTE (Windows):** Docker Desktop debe estar **abierto y en ejecución** antes de ejecutar cualquier comando Docker. Verifica que el ícono de Docker aparezca en la barra de tareas y diga "Docker Desktop is running".
 
 ---
 
-## 🚀 Instalación y Ejecución con Docker (Recomendado)
+## Instalación y Ejecución con Docker (Recomendado)
 
 ### Paso 1 — Clonar el repositorio
 
@@ -99,11 +99,11 @@ Abre tu navegador y visita:
 
 | Servicio              | URL                                 |
 |-----------------------|-------------------------------------|
-| **🖥️ Frontend**       | **http://localhost:5173**           |
-| **⚙️ Backend API**    | http://localhost:3001               |
-| **📄 Docs API (Swagger)** | http://localhost:3001/docs      |
+| **Frontend**       | **http://localhost:5173**           |
+| **Backend API**    | http://localhost:3001               |
+| **Docs API (Swagger)** | http://localhost:3001/docs      |
 
-> **⚠️ NOTA:** NO uses `http://localhost:3000`. El frontend funcional es el que se sirve en el puerto **5173** (servidor de desarrollo Vite). El puerto 3000 ya no se utiliza.
+> **NOTA:** NO uses `http://localhost:3000`. El frontend funcional es el que se sirve en el puerto **5173** (servidor de desarrollo Vite). El puerto 3000 ya no se utiliza.
 
 ### Paso 5 — Iniciar sesión
 
@@ -114,7 +114,7 @@ Usa las siguientes credenciales de administrador para la primera prueba:
 
 ---
 
-## 🛑 Detener y Reiniciar los Servicios
+## Detener y Reiniciar los Servicios
 
 ```bash
 # Detener todos los servicios (mantiene los datos de la BD)
@@ -134,7 +134,7 @@ docker compose up --build
 
 ---
 
-## 💻 Ejecución en Desarrollo Local (sin Docker)
+## Ejecución en Desarrollo Local (sin Docker)
 
 Si prefieres ejecutar los servicios directamente en tu máquina:
 
@@ -185,7 +185,7 @@ El frontend estará disponible en **http://localhost:5173**.
 
 ---
 
-## 🔌 Puertos del Sistema
+## Puertos del Sistema
 
 | Servicio    | Puerto (Docker) | Puerto (Local)  | Descripción                        |
 |-------------|-----------------|------------------|------------------------------------|
@@ -197,7 +197,7 @@ El frontend estará disponible en **http://localhost:5173**.
 
 ---
 
-## 👥 Credenciales de Prueba
+## Credenciales de Prueba
 
 ### Administrador General (Matriz Ambato)
 
@@ -242,7 +242,7 @@ Cada agencia tiene su propio administrador. Contraseña uniforme: `Admin2024.`
 
 ---
 
-## 🔧 Comandos Útiles de Docker
+## Comandos Útiles de Docker
 
 ```bash
 # Ver estado de los servicios
@@ -268,7 +268,7 @@ docker compose exec db psql -U kullki_user -d kullki_wasi_db
 
 ---
 
-## 🐛 Solución de Problemas
+## Solución de Problemas
 
 ### "port is already in use"
 
@@ -339,7 +339,7 @@ Abre Docker Desktop desde el menú inicio y espera a que se inicialice completam
 
 ---
 
-## 📋 Resumen Rápido (Copiar y Pegar)
+## Resumen Rápido (Copiar y Pegar)
 
 Para levantar el proyecto completo desde cero en **4 comandos**:
 
