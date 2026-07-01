@@ -24,7 +24,8 @@ services:
       - DATABASE_URL=postgresql://kullki_user:kullki_pass@db:5432/kullki_wasi_db
       - SECRET_KEY=kullki_wasi_security_token_secret_2026
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - kullki-wasi-net
 
@@ -40,6 +41,12 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/kullkidb_postgres.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kullki_user -d kullki_wasi_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     networks:
       - kullki-wasi-net
 

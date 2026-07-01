@@ -242,6 +242,7 @@ const Employees = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  const isJefe = user?.role === 'jefe_agencia';
   const effectiveAgency = user?.agency || 'ALL';
 
   // Empleados sólo de la agencia activa (para KPIs)
@@ -263,7 +264,11 @@ const Employees = () => {
   const paginated   = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const openAdd = () => {
-    setForm({ ...BLANK_FORM, hireDate: new Date().toISOString().split('T')[0] });
+    setForm({
+      ...BLANK_FORM,
+      hireDate: new Date().toISOString().split('T')[0],
+      agency: isJefe ? (user?.agency || 'MAT') : 'MAT',
+    });
     setEditing(null);
     setShowForm(true);
   };
@@ -606,10 +611,10 @@ const Employees = () => {
                 <div className="space-y-1">
                   <label className="form-label">Rol de Sistema</label>
                   <select value={form.role} onChange={e => field('role', e.target.value)} className="form-input">
-                    {roles.length > 0
-                      ? roles.map(r => <option key={r.id} value={r.name}>{ROLES[r.name]?.name || r.name}</option>)
-                      : Object.entries(ROLES).map(([id, r]) => <option key={id} value={id}>{r.name}</option>)
-                    }
+                    {(roles.length > 0
+                      ? roles.filter(r => !isJefe || r.name !== 'admin')
+                      : Object.entries(ROLES).filter(([id]) => !isJefe || id !== 'admin').map(([id, r]) => ({ id, name: id, label: r.name }))
+                    ).map(r => <option key={r.id} value={r.name}>{ROLES[r.name]?.name || r.name}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">
@@ -620,9 +625,18 @@ const Employees = () => {
                 </div>
                 <div className="space-y-1">
                   <label className="form-label">Agencia Asignada</label>
-                  <select value={form.agency} onChange={e => field('agency', e.target.value)} className="form-input">
-                    {agencies.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                  </select>
+                  {isJefe ? (
+                    <input
+                      type="text"
+                      value={agencies.find(a => a.id === form.agency)?.name || form.agency}
+                      disabled
+                      className="form-input bg-slate-100 text-slate-400 cursor-not-allowed"
+                    />
+                  ) : (
+                    <select value={form.agency} onChange={e => field('agency', e.target.value)} className="form-input">
+                      {agencies.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <label className="form-label">Estado Laboral</label>

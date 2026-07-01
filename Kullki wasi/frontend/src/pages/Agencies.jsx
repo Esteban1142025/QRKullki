@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import apiClient from '../services/api/apiClient';
 import Swal from 'sweetalert2';
-import { MdStore, MdLocationOn, MdPhone, MdAdd, MdEdit, MdDelete, MdClose, MdSave, MdRefresh } from 'react-icons/md';
+import { MdStore, MdLocationOn, MdPhone, MdAdd, MdEdit, MdDelete, MdClose, MdSave, MdRefresh, MdPerson } from 'react-icons/md';
 
 // Cuenta alertas abiertas por código de agencia y devuelve el nivel operativo
 const getAlertLevel = (agencyCode, alertCounts) => {
@@ -11,13 +11,16 @@ const getAlertLevel = (agencyCode, alertCounts) => {
   return             { text: 'Crítico',  count, color: 'bg-red-500 shadow-red-500/40 text-red-950',             ping: 'bg-red-400',     badge: 'bg-red-100 text-red-700 border-red-300'         };
 };
 
+const BLANK_JEFE = { nombres: '', apellidos: '', identificacion: '', email: '', password: '' };
+
 const Agencies = () => {
   const [agencies, setAgencies]       = useState([]);
   const [alertCounts, setAlertCounts] = useState({});
   const [loading, setLoading]         = useState(true);
   const [showForm, setShowForm]       = useState(false);
   const [editing, setEditing]         = useState(null);
-  const [form, setForm] = useState({ id: '', id_agencia: null, name: '', address: '', phone: '', type: 'Sucursal', status: 'Activo' });
+  const [form, setForm]     = useState({ id: '', id_agencia: null, name: '', address: '', phone: '', type: 'Sucursal', status: 'Activo' });
+  const [jefeForm, setJefeForm] = useState(BLANK_JEFE);
 
   const fetchAgencies = useCallback(async () => {
     setLoading(true);
@@ -47,6 +50,7 @@ const Agencies = () => {
 
   const openAdd = () => {
     setForm({ id: '', id_agencia: null, name: '', address: '', phone: '', type: 'Sucursal', status: 'Activo' });
+    setJefeForm(BLANK_JEFE);
     setEditing(null);
     setShowForm(true);
   };
@@ -96,6 +100,25 @@ const Agencies = () => {
       return;
     }
 
+    if (!editing) {
+      if (!jefeForm.nombres.trim() || jefeForm.nombres.trim().length < 2) {
+        Swal.fire({ icon: 'error', title: 'Jefe inválido', text: 'Ingrese el nombre del jefe (mínimo 2 caracteres).', background: '#ffffff', color: '#1e293b' });
+        return;
+      }
+      if (!jefeForm.apellidos.trim() || jefeForm.apellidos.trim().length < 2) {
+        Swal.fire({ icon: 'error', title: 'Jefe inválido', text: 'Ingrese los apellidos del jefe (mínimo 2 caracteres).', background: '#ffffff', color: '#1e293b' });
+        return;
+      }
+      if (!/^\d{10}$/.test(jefeForm.identificacion)) {
+        Swal.fire({ icon: 'error', title: 'Cédula inválida', text: 'La cédula del jefe debe tener exactamente 10 dígitos.', background: '#ffffff', color: '#1e293b' });
+        return;
+      }
+      if (!jefeForm.password || jefeForm.password.length < 6) {
+        Swal.fire({ icon: 'error', title: 'Contraseña inválida', text: 'La contraseña del jefe debe tener al menos 6 caracteres.', background: '#ffffff', color: '#1e293b' });
+        return;
+      }
+    }
+
     const payload = {
       nombre: trimmedName,
       codigo: trimmedId || undefined,
@@ -105,6 +128,16 @@ const Agencies = () => {
       estado: form.status === 'Activo',
     };
 
+    if (!editing) {
+      payload.jefe = {
+        nombres: jefeForm.nombres.trim(),
+        apellidos: jefeForm.apellidos.trim(),
+        identificacion: jefeForm.identificacion.trim(),
+        email: jefeForm.email.trim() || undefined,
+        password: jefeForm.password,
+      };
+    }
+
     try {
       if (editing) {
         await apiClient.put(`/agencias/${editing.id_agencia}`, payload);
@@ -113,7 +146,7 @@ const Agencies = () => {
       }
       await fetchAgencies();
       setShowForm(false);
-      Swal.fire({ icon: 'success', title: 'Agencia Guardada', timer: 1500, showConfirmButton: false });
+      Swal.fire({ icon: 'success', title: editing ? 'Agencia Actualizada' : 'Agencia Creada', timer: 1500, showConfirmButton: false });
     } catch (err) {
       Swal.fire({ icon: 'error', title: 'Error', text: err.response?.data?.detail || 'Error al guardar la agencia.' });
     }
@@ -333,13 +366,77 @@ const Agencies = () => {
                 </div>
               </div>
 
+              {/* Sección Jefe de Agencia — solo al crear */}
+              {!editing && (
+                <div className="border border-[#84cc16]/40 rounded-xl overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-3 bg-[#84cc16]/8 border-b border-[#84cc16]/20">
+                    <MdPerson size={18} className="text-[#65a30d]" />
+                    <span className="text-sm font-bold text-slate-700">Jefe de Agencia</span>
+                    <span className="ml-1 text-[10px] font-bold text-white bg-red-400 px-2 py-0.5 rounded-full uppercase tracking-wide">Obligatorio</span>
+                  </div>
+                  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="form-label">Nombres</label>
+                      <input
+                        type="text"
+                        value={jefeForm.nombres}
+                        onChange={e => setJefeForm(f => ({ ...f, nombres: e.target.value }))}
+                        placeholder="Ej: María Elena"
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="form-label">Apellidos</label>
+                      <input
+                        type="text"
+                        value={jefeForm.apellidos}
+                        onChange={e => setJefeForm(f => ({ ...f, apellidos: e.target.value }))}
+                        placeholder="Ej: Guevara Torres"
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="form-label">Cédula de Identidad</label>
+                      <input
+                        type="text"
+                        value={jefeForm.identificacion}
+                        onChange={e => setJefeForm(f => ({ ...f, identificacion: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
+                        placeholder="10 dígitos"
+                        maxLength={10}
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="form-label">Correo (opcional)</label>
+                      <input
+                        type="email"
+                        value={jefeForm.email}
+                        onChange={e => setJefeForm(f => ({ ...f, email: e.target.value }))}
+                        placeholder="jefe@kullkiwasi.com"
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="form-label">Contraseña de acceso</label>
+                      <input
+                        type="password"
+                        value={jefeForm.password}
+                        onChange={e => setJefeForm(f => ({ ...f, password: e.target.value }))}
+                        placeholder="Mínimo 6 caracteres"
+                        className="form-input"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Acciones */}
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 mt-2">
                 <button type="button" onClick={() => setShowForm(false)} className="px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-all cursor-pointer">
                   Cancelar
                 </button>
                 <button type="submit" className="btn-primary">
-                  <MdSave size={18} /> Guardar Agencia
+                  <MdSave size={18} /> {editing ? 'Guardar Cambios' : 'Crear Agencia'}
                 </button>
               </div>
             </form>

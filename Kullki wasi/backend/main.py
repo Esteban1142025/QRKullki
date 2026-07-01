@@ -167,6 +167,15 @@ def require_admin(credentials: HTTPAuthorizationCredentials = Depends(_http_bear
         raise HTTPException(status_code=403, detail="Solo el administrador puede realizar esta acción")
     return roles
 
+def get_caller(credentials: HTTPAuthorizationCredentials = Depends(_http_bearer)):
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Token requerido")
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        return {"roles": payload.get("roles", []), "agency_id": payload.get("agency_id")}
+    except Exception:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
+
 # --- Schemas ---
 
 class LoginRequest(BaseModel):
@@ -282,6 +291,49 @@ class AgenciaCreate(BaseModel):
             raise ValueError('Tipo de agencia inválido')
         return v
 
+class JefeCreate(BaseModel):
+    identificacion: str
+    nombres: str
+    apellidos: str
+    email: Optional[str] = None
+    password: str
+
+    @field_validator('identificacion')
+    @classmethod
+    def validate_jefe_ident(cls, v):
+        v = v.strip()
+        if not v.isdigit() or len(v) != 10:
+            raise ValueError('La cédula del jefe debe tener 10 dígitos numéricos')
+        return v
+
+    @field_validator('nombres', 'apellidos')
+    @classmethod
+    def validate_jefe_nombre(cls, v):
+        v = v.strip()
+        if len(v) < 2:
+            raise ValueError('Debe tener al menos 2 caracteres')
+        return v
+
+    @field_validator('email')
+    @classmethod
+    def validate_jefe_email(cls, v):
+        if not v:
+            return v
+        v = v.strip().lower()
+        if not _EMAIL_RE.match(v):
+            raise ValueError('Formato de correo electrónico inválido')
+        return v
+
+    @field_validator('password')
+    @classmethod
+    def validate_jefe_password(cls, v):
+        if len(v) < 6:
+            raise ValueError('La contraseña debe tener al menos 6 caracteres')
+        return v
+
+class AgenciaConJefeCreate(AgenciaCreate):
+    jefe: JefeCreate
+
 class AreaUpdate(BaseModel):
     nivel_riesgo: Optional[str] = None
     horario: Optional[str] = None
@@ -355,7 +407,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
 
     access_token_expires = datetime.timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": emp.identificacion, "roles": roles, "permisos": list(set(permisos))},
+        data={"sub": emp.identificacion, "roles": roles, "permisos": list(set(permisos)), "agency_id": emp.id_agencia_base},
         expires_delta=access_token_expires
     )
     rol_principal = roles[0] if roles else "empleado"
@@ -618,8 +670,15 @@ def get_permissions_by_cedula(cedula: str, db: Session = Depends(get_db)):
 # --- Empleados ---
 
 @app.get("/api/v1/empleados")
-def listar_empleados(db: Session = Depends(get_db)):
-    empleados = db.query(models.Empleado).all()
+def listar_empleados(caller=Depends(get_caller), db: Session = Depends(get_db)):
+    roles = caller["roles"]
+    if "jefe_agencia" in roles and "admin" not in roles:
+        agency_id = caller["agency_id"]
+        empleados = db.query(models.Empleado).filter(
+            models.Empleado.id_agencia_base == agency_id
+        ).all() if agency_id else []
+    else:
+        empleados = db.query(models.Empleado).all()
     return [format_empleado(e) for e in empleados]
 
 @app.get("/api/v1/empleados/{id_empleado}")
@@ -630,7 +689,20 @@ def obtener_empleado(id_empleado: int, db: Session = Depends(get_db)):
     return format_empleado(e)
 
 @app.post("/api/v1/empleados")
-def crear_empleado(data: EmpleadoCreate, db: Session = Depends(get_db)):
+def crear_empleado(data: EmpleadoCreate, caller=Depends(get_caller), db: Session = Depends(get_db)):
+    caller_roles = caller["roles"]
+    is_admin = "admin" in caller_roles
+    is_jefe  = "jefe_agencia" in caller_roles
+    is_th    = "talento_humano" in caller_roles
+    if not is_admin and not is_jefe and not is_th:
+        raise HTTPException(status_code=403, detail="No tiene permiso para crear colaboradores")
+
+    if is_jefe and not is_admin:
+        data.id_agencia_base = caller["agency_id"]
+        admin_rol = db.query(models.Rol).filter(models.Rol.nombre == 'admin').first()
+        if admin_rol and admin_rol.id_rol in data.role_ids:
+            raise HTTPException(status_code=403, detail="El jefe de agencia no puede asignar el rol de Administrador")
+
     existing = db.query(models.Empleado).filter(
         models.Empleado.identificacion == data.identificacion
     ).first()
@@ -665,10 +737,19 @@ def crear_empleado(data: EmpleadoCreate, db: Session = Depends(get_db)):
     return format_empleado(e)
 
 @app.put("/api/v1/empleados/{id_empleado}")
-def actualizar_empleado(id_empleado: int, data: EmpleadoCreate, db: Session = Depends(get_db)):
+def actualizar_empleado(id_empleado: int, data: EmpleadoCreate, caller=Depends(get_caller), db: Session = Depends(get_db)):
+    caller_roles = caller["roles"]
     e = db.query(models.Empleado).filter(models.Empleado.id_empleado == id_empleado).first()
     if not e:
         raise HTTPException(status_code=404, detail="Empleado no encontrado")
+
+    if "jefe_agencia" in caller_roles and "admin" not in caller_roles:
+        if e.id_agencia_base != caller["agency_id"]:
+            raise HTTPException(status_code=403, detail="Solo puede editar colaboradores de su propia agencia")
+        admin_rol = db.query(models.Rol).filter(models.Rol.nombre == 'admin').first()
+        if admin_rol and admin_rol.id_rol in data.role_ids:
+            raise HTTPException(status_code=403, detail="El jefe de agencia no puede asignar el rol de Administrador")
+        data.id_agencia_base = caller["agency_id"]
 
     dup = db.query(models.Empleado).filter(
         models.Empleado.identificacion == data.identificacion,
@@ -702,10 +783,14 @@ def actualizar_empleado(id_empleado: int, data: EmpleadoCreate, db: Session = De
     return format_empleado(e)
 
 @app.delete("/api/v1/empleados/{id_empleado}")
-def eliminar_empleado(id_empleado: int, db: Session = Depends(get_db)):
+def eliminar_empleado(id_empleado: int, caller=Depends(get_caller), db: Session = Depends(get_db)):
+    caller_roles = caller["roles"]
     e = db.query(models.Empleado).filter(models.Empleado.id_empleado == id_empleado).first()
     if not e:
         raise HTTPException(status_code=404, detail="Empleado no encontrado")
+    if "jefe_agencia" in caller_roles and "admin" not in caller_roles:
+        if e.id_agencia_base != caller["agency_id"]:
+            raise HTTPException(status_code=403, detail="Solo puede eliminar colaboradores de su propia agencia")
     db.delete(e)
     db.commit()
     return {"message": "Empleado eliminado"}
@@ -718,11 +803,18 @@ def listar_agencias(db: Session = Depends(get_db)):
     return [format_agencia(a) for a in agencias]
 
 @app.post("/api/v1/agencias")
-def crear_agencia(data: AgenciaCreate, db: Session = Depends(get_db)):
+def crear_agencia(data: AgenciaConJefeCreate, _=Depends(require_admin), db: Session = Depends(get_db)):
     if data.codigo:
         dup = db.query(models.Agencia).filter(models.Agencia.codigo == data.codigo.upper()).first()
         if dup:
             raise HTTPException(status_code=400, detail="Ya existe una agencia con este código")
+
+    j = data.jefe
+    if db.query(models.Empleado).filter(models.Empleado.identificacion == j.identificacion).first():
+        raise HTTPException(status_code=400, detail="Ya existe un empleado con la cédula del jefe designado")
+    if j.email and db.query(models.Empleado).filter(models.Empleado.email == j.email).first():
+        raise HTTPException(status_code=400, detail="Ya existe un empleado con el correo del jefe designado")
+
     a = models.Agencia(
         nombre=data.nombre,
         codigo=data.codigo.upper() if data.codigo else None,
@@ -732,6 +824,22 @@ def crear_agencia(data: AgenciaCreate, db: Session = Depends(get_db)):
         estado=data.estado,
     )
     db.add(a)
+    db.flush()
+
+    jefe_rol = db.query(models.Rol).filter(models.Rol.nombre == 'jefe_agencia').first()
+    emp_jefe = models.Empleado(
+        identificacion=j.identificacion,
+        nombres=j.nombres,
+        apellidos=j.apellidos,
+        email=j.email,
+        id_agencia_base=a.id_agencia,
+        departamento='Operaciones Financieras',
+        estado_laboral='ACTIVO',
+        password_hash=bcrypt.hashpw(j.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
+    )
+    if jefe_rol:
+        emp_jefe.roles = [jefe_rol]
+    db.add(emp_jefe)
     db.commit()
     db.refresh(a)
     return format_agencia(a)

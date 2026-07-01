@@ -137,8 +137,14 @@ CREATE TABLE alertas_seguridad (
 -- DATOS INICIALES PARA PRUEBAS
 -- ============================================
 
--- Insertar Agencia
-INSERT INTO agencias (nombre, direccion, estado) VALUES ('MAT', 'Matriz Principal', true);
+-- Insertar Agencias
+INSERT INTO agencias (nombre, codigo, direccion, tipo, estado) VALUES
+  ('Matriz Ambato',       'MAT', 'Av. Cevallos y Lalama, Ambato',            'Principal', true),
+  ('Agencia Pelileo',     'PEL', 'Av. 22 de Julio y Garcia Moreno, Pelileo', 'Sucursal',  true),
+  ('Agencia Pillaro',     'PIL', 'Bolivar y Padre Chacon, Pillaro',           'Sucursal',  true),
+  ('Agencia Banos',       'BAN', 'Ambato y Rocafuerte, Banos de Agua Santa',  'Sucursal',  true),
+  ('Agencia Salcedo',     'SAL', 'Sucre y 24 de Mayo, Salcedo',               'Sucursal',  true),
+  ('Agencia Quisapincha', 'QUI', 'Parroquia Quisapincha, Ambato',             'Extension', true);
 
 -- Insertar Permisos
 INSERT INTO permisos (codigo_permiso, descripcion) VALUES 
@@ -206,17 +212,25 @@ SELECT r.id_rol, p.id_permiso
 FROM roles r, permisos p 
 WHERE r.nombre = 'tecnico_ti' AND p.codigo_permiso = 'ver_reportes';
 
--- Insertar Usuarios de Prueba (contraseñas en texto plano para desarrollo)
--- NOTA: En producción usar contraseñas hasheadas con bcrypt
-INSERT INTO empleados (identificacion, nombres, apellidos, email, id_agencia_base, password_hash, estado_laboral) VALUES 
-  ('0987654321', 'Carlos', 'Ruiz', 'carlos.ruiz@kullkiwasi.com', 1, 'admin123', 'ACTIVO'),
-  ('1712345678', 'Maria', 'Garcia', 'maria.garcia@kullkiwasi.com', 1, 'empleado123', 'ACTIVO'),
-  ('1234567890', 'Juan', 'Pérez', 'juan.perez@kullkiwasi.com', 1, 'talento123', 'ACTIVO'),
-  ('2345678901', 'Ana', 'López', 'ana.lopez@kullkiwasi.com', 1, 'riesgos123', 'ACTIVO'),
-  ('3456789012', 'Carlos', 'Mendoza', 'carlos.mendoza@kullkiwasi.com', 1, 'seguridad123', 'ACTIVO'),
-  ('4567890123', 'María', 'Torres', 'maria.torres@kullkiwasi.com', 1, 'auditor123', 'ACTIVO'),
-  ('5678901234', 'Roberto', 'Sánchez', 'roberto.sanchez@kullkiwasi.com', 1, 'jefe123', 'ACTIVO'),
-  ('6789012345', 'Luis', 'Ramírez', 'luis.ramirez@kullkiwasi.com', 1, 'tecnico123', 'ACTIVO');
+-- Insertar Usuarios (contraseñas hasheadas con bcrypt)
+-- Agencia MAT — 8 roles completos
+INSERT INTO empleados (identificacion, nombres, apellidos, email, id_agencia_base, password_hash, estado_laboral, departamento) VALUES
+  ('0987654321', 'Administrador', 'del Sistema',  'admin@kullkiwasi.fin.ec',              1, '$2b$12$4Cjqvgp2kbLVPAxzNx9ut.yLUhFUXpDBHqKqNGFsLg8iRbs4FEHGa', 'ACTIVO', 'Administracion General'),
+  ('1712345678', 'Maria',         'Garcia',        'maria.garcia@kullkiwasi.com',          1, '$2b$12$cNA0JSbyRD2yzLvecAmxVutnaEGhqq91Hl1pBHl8Td.vUIAgayBqi', 'ACTIVO', 'Caja y Servicios'),
+  ('1234567890', 'Juan',          'Perez',         'juan.perez@kullkiwasi.com',            1, '$2b$12$4QXi.oXlcmC5btTRpWm7z..E.FNkqOHvn3oJtRh0CJTTifxp40oqC', 'ACTIVO', 'Talento Humano'),
+  ('2345678901', 'Ana',           'Lopez',         'ana.lopez@kullkiwasi.com',             1, '$2b$12$nPGRqHWuhG7SuNqdNVknjOAsLt.ZbqArBsYI8sXY/ajxlkbk.61Mm', 'ACTIVO', 'Gestion de Riesgos'),
+  ('3456789012', 'Carlos',        'Mendoza',       'carlos.mendoza@kullkiwasi.com',        1, '$2b$12$JLkG3199kWyJIGGOTyUnAuvVu6NTRCedmKOfFFY7Un/8lO2Oig9Ma', 'ACTIVO', 'Seguridad y Vigilancia'),
+  ('4567890123', 'Maria',         'Torres',        'maria.torres@kullkiwasi.com',          1, '$2b$12$bAoFVN6c95.mn0g5GhG8xO3Ex1I2VDqUT.qPW.nVQL0vii0cjkoKS', 'ACTIVO', 'Auditoria Interna'),
+  ('5678901234', 'Roberto',       'Sanchez',       'roberto.sanchez@kullkiwasi.com',       1, '$2b$12$ARKoMnctmh0oZ3IrlGRLSORi64DiG.fXo9FvY11uC6ns5vZjT3WMG', 'ACTIVO', 'Operaciones Financieras'),
+  ('6789012345', 'Luis',          'Ramirez',       'luis.ramirez@kullkiwasi.com',          1, '$2b$12$8ORSo0uNL9uWgSMNjjgUhuvfLDM5cX81WaRSl78chwRu4xArzF1UO', 'ACTIVO', 'Tecnologia e Informacion');
+
+-- Jefes de agencia por sucursal (contraseña: jefe.CODIGO2026)
+INSERT INTO empleados (identificacion, nombres, apellidos, email, id_agencia_base, password_hash, estado_laboral, departamento) VALUES
+  ('1800000001', 'Marco Antonio',    'Cepeda Vargas',  'marco.cepeda@kullkiwasi.fin.ec',   (SELECT id_agencia FROM agencias WHERE codigo='PEL'), '$2b$12$To5.ZaoBxJm7KVQnEmMA1.VqtkxVZGuMN0NmoJKmIYrFGA9D9/FU2', 'ACTIVO', 'Operaciones Financieras'),
+  ('1800000002', 'Diana Patricia',   'Flores Nunez',   'diana.flores@kullkiwasi.fin.ec',   (SELECT id_agencia FROM agencias WHERE codigo='PIL'), '$2b$12$fGFcJaPKFdSS2fhMUST2j.tQ4BQzviVJV6e8GpIoI8rG9atxgoH3K', 'ACTIVO', 'Operaciones Financieras'),
+  ('1800000003', 'Rodrigo Sebastian','Mora Hidalgo',   'rodrigo.mora@kullkiwasi.fin.ec',   (SELECT id_agencia FROM agencias WHERE codigo='BAN'), '$2b$12$teXaHT4LkwVZSvz0r75E2OFFDdmLGeCJEslb8MkoawoVG1cXVQ2Hu', 'ACTIVO', 'Operaciones Financieras'),
+  ('1800000004', 'Elena Beatriz',    'Chavez Salazar', 'elena.chavez@kullkiwasi.fin.ec',   (SELECT id_agencia FROM agencias WHERE codigo='SAL'), '$2b$12$O01v7cbEDiicTA.Gf2pOVuWALaENicWvJW/cZbwUTf1YyvElUMjIm', 'ACTIVO', 'Operaciones Financieras'),
+  ('1800000005', 'Fernando Alexis',  'Tello Orozco',   'fernando.tello@kullkiwasi.fin.ec', (SELECT id_agencia FROM agencias WHERE codigo='QUI'), '$2b$12$nr10s8MsHtJEDZ5NmN6o.eStf72b.6RLZSlrfponw0z9p8wY0hSdK', 'ACTIVO', 'Operaciones Financieras');
 
 -- Asignar Roles a Usuarios
 INSERT INTO empleados_roles (id_empleado, id_rol) 
@@ -255,7 +269,53 @@ SELECT e.id_empleado, r.id_rol
 FROM empleados e, roles r 
 WHERE e.identificacion = '5678901234' AND r.nombre = 'jefe_agencia';
 
-INSERT INTO empleados_roles (id_empleado, id_rol) 
-SELECT e.id_empleado, r.id_rol 
-FROM empleados e, roles r 
+INSERT INTO empleados_roles (id_empleado, id_rol)
+SELECT e.id_empleado, r.id_rol
+FROM empleados e, roles r
 WHERE e.identificacion = '6789012345' AND r.nombre = 'tecnico_ti';
+
+-- Roles para jefes de sucursales
+INSERT INTO empleados_roles (id_empleado, id_rol)
+SELECT e.id_empleado, r.id_rol FROM empleados e, roles r
+WHERE e.identificacion IN ('1800000001','1800000002','1800000003','1800000004','1800000005')
+  AND r.nombre = 'jefe_agencia';
+
+-- ============================================
+-- AREAS CRITICAS
+-- ============================================
+
+-- MAT — Matriz Ambato (7 areas)
+INSERT INTO areas_restringidas (id_agencia, nombre, nivel_riesgo, horario, estado, id_permiso_requerido) VALUES
+  ((SELECT id_agencia FROM agencias WHERE codigo='MAT'), 'Boveda Principal',            'Critico', '24/7',          true, (SELECT id_permiso FROM permisos WHERE codigo_permiso='acceso_boveda')),
+  ((SELECT id_agencia FROM agencias WHERE codigo='MAT'), 'Cuarto de Servidores TI',     'Alto',    '08:00 - 22:00', true, (SELECT id_permiso FROM permisos WHERE codigo_permiso='acceso_total')),
+  ((SELECT id_agencia FROM agencias WHERE codigo='MAT'), 'Area de Cajas',               'Alto',    '08:00 - 18:00', true, (SELECT id_permiso FROM permisos WHERE codigo_permiso='acceso_cajas')),
+  ((SELECT id_agencia FROM agencias WHERE codigo='MAT'), 'Archivo General e Historico', 'Medio',   '08:00 - 17:00', true, (SELECT id_permiso FROM permisos WHERE codigo_permiso='ver_reportes')),
+  ((SELECT id_agencia FROM agencias WHERE codigo='MAT'), 'Oficinas Administrativas',    'Critico', '07:00 - 19:00', true, (SELECT id_permiso FROM permisos WHERE codigo_permiso='acceso_total')),
+  ((SELECT id_agencia FROM agencias WHERE codigo='MAT'), 'Parqueadero Institucional',   'Bajo',    '06:00 - 22:00', true, NULL),
+  ((SELECT id_agencia FROM agencias WHERE codigo='MAT'), 'Sala de Marketing',           'Medio',   '08:00 - 18:00', true, NULL);
+
+-- Sucursales — un acceso principal por agencia
+INSERT INTO areas_restringidas (id_agencia, nombre, nivel_riesgo, horario, estado) VALUES
+  ((SELECT id_agencia FROM agencias WHERE codigo='PEL'), 'Acceso Principal Pelileo',     'Medio', '08:00 - 18:00', true),
+  ((SELECT id_agencia FROM agencias WHERE codigo='PIL'), 'Acceso Principal Pillaro',     'Medio', '08:00 - 18:00', true),
+  ((SELECT id_agencia FROM agencias WHERE codigo='BAN'), 'Acceso Principal Banos',       'Medio', '08:00 - 18:00', true),
+  ((SELECT id_agencia FROM agencias WHERE codigo='SAL'), 'Acceso Principal Salcedo',     'Medio', '08:00 - 18:00', true),
+  ((SELECT id_agencia FROM agencias WHERE codigo='QUI'), 'Acceso Principal Quisapincha', 'Medio', '08:00 - 17:00', true);
+
+-- ============================================
+-- DISPOSITIVOS QR (un lector por area)
+-- ============================================
+
+INSERT INTO dispositivos_escaneo (id_area, identificador_equipo, mac_address, ip_address, estado) VALUES
+  ((SELECT id_area FROM areas_restringidas WHERE nombre='Boveda Principal'),            'LECTOR-MAT-BOVEDA-01',      'AA:BB:CC:01:01:01', '192.168.10.11', true),
+  ((SELECT id_area FROM areas_restringidas WHERE nombre='Cuarto de Servidores TI'),     'LECTOR-MAT-SERVIDORES-01',  'AA:BB:CC:01:01:02', '192.168.10.12', true),
+  ((SELECT id_area FROM areas_restringidas WHERE nombre='Area de Cajas'),               'LECTOR-MAT-CAJAS-01',       'AA:BB:CC:01:01:03', '192.168.10.13', true),
+  ((SELECT id_area FROM areas_restringidas WHERE nombre='Archivo General e Historico'), 'LECTOR-MAT-ARCHIVO-01',     'AA:BB:CC:01:01:04', '192.168.10.14', true),
+  ((SELECT id_area FROM areas_restringidas WHERE nombre='Oficinas Administrativas'),    'LECTOR-MAT-OFICINAS-01',    'AA:BB:CC:01:01:05', '192.168.10.15', true),
+  ((SELECT id_area FROM areas_restringidas WHERE nombre='Parqueadero Institucional'),   'LECTOR-MAT-PARQUEADERO-01', 'AA:BB:CC:01:01:06', '192.168.10.16', true),
+  ((SELECT id_area FROM areas_restringidas WHERE nombre='Sala de Marketing'),           'LECTOR-MAT-MARKETING-01',   'AA:BB:CC:01:01:07', '192.168.10.17', true),
+  ((SELECT id_area FROM areas_restringidas WHERE nombre='Acceso Principal Pelileo'),     'LECTOR-PEL-ACCESO-01',      'AA:BB:CC:02:01:01', '192.168.20.11', true),
+  ((SELECT id_area FROM areas_restringidas WHERE nombre='Acceso Principal Pillaro'),     'LECTOR-PIL-ACCESO-01',      'AA:BB:CC:03:01:01', '192.168.30.11', true),
+  ((SELECT id_area FROM areas_restringidas WHERE nombre='Acceso Principal Banos'),       'LECTOR-BAN-ACCESO-01',      'AA:BB:CC:04:01:01', '192.168.40.11', true),
+  ((SELECT id_area FROM areas_restringidas WHERE nombre='Acceso Principal Salcedo'),     'LECTOR-SAL-ACCESO-01',      'AA:BB:CC:05:01:01', '192.168.50.11', true),
+  ((SELECT id_area FROM areas_restringidas WHERE nombre='Acceso Principal Quisapincha'), 'LECTOR-QUI-ACCESO-01',      'AA:BB:CC:06:01:01', '192.168.60.11', true);
