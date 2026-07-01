@@ -25,19 +25,31 @@ export const AuthProvider = ({ children }) => {
       try {
         const parsed = JSON.parse(storedUser);
         setUser(parsed);
-        // Refrescar permisos y datos de agencia desde la BD en background
+        // Resincronizar el perfil completo desde la BD: si el usuario ya no existe,
+        // fue desactivado, o el token pertenece a un despliegue/base de datos distinta,
+        // cerramos la sesión en vez de mostrar datos obsoletos del localStorage.
         apiClient.get(`/auth/permissions/${parsed.dni}`)
           .then(res => {
             const updated = {
               ...parsed,
               permissions: res.data.permissions,
-              // Actualizar el nombre de la agencia desde BD (sin pisar un switch manual)
               agencyName: res.data.agencyName || parsed.agencyName,
+              name: res.data.name || parsed.name,
+              email: res.data.email ?? parsed.email,
+              role: res.data.role || parsed.role,
+              roleName: res.data.roleName || parsed.roleName,
+              status: res.data.status || parsed.status,
             };
             localStorage.setItem('kw_user', JSON.stringify(updated));
             setUser(updated);
           })
-          .catch(() => { /* falla silenciosa — usamos los permisos del localStorage */ });
+          .catch(() => {
+            // El perfil ya no es válido en esta base de datos (usuario eliminado,
+            // inactivo, o token de otro entorno) — forzar cierre de sesión.
+            localStorage.removeItem('kw_user');
+            localStorage.removeItem('kw_token');
+            setUser(null);
+          });
       } catch (e) {
         localStorage.removeItem('kw_user');
         localStorage.removeItem('kw_token');

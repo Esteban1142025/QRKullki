@@ -12,6 +12,7 @@ import datetime
 import bcrypt
 import jwt
 import re
+import os
 
 # Convierte un datetime naive (guardado en UTC) a string ISO 8601 con sufijo Z
 # para que JavaScript lo interprete correctamente como UTC y muestre la hora local del cliente
@@ -20,7 +21,7 @@ def utc_iso(dt):
         return None
     return dt.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
 
-SECRET_KEY = "kullki-wasi-super-secret-jwt-key"
+SECRET_KEY = os.environ.get("SECRET_KEY", "kullki-wasi-super-secret-jwt-key")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 480
 
@@ -172,7 +173,7 @@ def get_caller(credentials: HTTPAuthorizationCredentials = Depends(_http_bearer)
         raise HTTPException(status_code=401, detail="Token requerido")
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        return {"roles": payload.get("roles", []), "agency_id": payload.get("agency_id")}
+        return {"roles": payload.get("roles", []), "agency_id": payload.get("agency_id"), "sub": payload.get("sub")}
     except Exception:
         raise HTTPException(status_code=401, detail="Token inválido o expirado")
 
@@ -648,12 +649,17 @@ async def restaurar_backup_upload(file: UploadFile = File(...), db: Session = De
         raise HTTPException(status_code=500, detail=f"Error durante la restauración: {str(ex)}")
 
 @app.get("/api/v1/auth/permissions/{cedula}")
-def get_permissions_by_cedula(cedula: str, db: Session = Depends(get_db)):
-    """Devuelve los permisos actualizados desde la BD para una cédula dada.
-    El frontend lo llama después de que RBAC guarda cambios, para refrescar sin logout."""
+def get_permissions_by_cedula(cedula: str, caller=Depends(get_caller), db: Session = Depends(get_db)):
+    """Devuelve el perfil y permisos actualizados desde la BD para una cédula dada.
+    El frontend lo llama al cargar la sesión y tras cambios en RBAC, para refrescar sin logout.
+    Requiere un token válido; solo el propio usuario o un admin pueden consultar el perfil."""
+    if cedula != caller.get("sub") and "admin" not in caller.get("roles", []):
+        raise HTTPException(status_code=403, detail="No puede consultar el perfil de otro usuario")
     emp = db.query(models.Empleado).filter(models.Empleado.identificacion == cedula).first()
     if not emp:
         raise HTTPException(status_code=404, detail="Empleado no encontrado")
+    if emp.estado_laboral != "ACTIVO":
+        raise HTTPException(status_code=403, detail="Usuario inactivo")
     permisos = []
     for r in emp.roles:
         for p in r.permisos:
@@ -663,10 +669,16 @@ def get_permissions_by_cedula(cedula: str, db: Session = Depends(get_db)):
     if emp.agencia_base:
         agencia_codigo = emp.agencia_base.codigo or "MAT"
         agencia_nombre = emp.agencia_base.nombre or "Casa Matriz — Ambato"
+    rol_principal = emp.roles[0].nombre if emp.roles else "empleado"
     return {
         "permissions": list(set(permisos)),
         "agency": agencia_codigo,
         "agencyName": agencia_nombre,
+        "name": f"{emp.nombres} {emp.apellidos}",
+        "email": emp.email,
+        "role": rol_principal,
+        "roleName": rol_principal.replace("_", " ").title(),
+        "status": emp.estado_laboral,
     }
 
 # --- Empleados ---
