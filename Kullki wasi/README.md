@@ -21,10 +21,9 @@ Kullki wasi/
 │   ├── main.py             Servidor FastAPI con todos los endpoints
 │   ├── models.py           Modelos SQLAlchemy (ORM)
 │   ├── database.py         Configuración de conexión a PostgreSQL
-│   ├── seed_db.py          Script para poblar la BD con usuarios de prueba
 │   └── requirements.txt    Dependencias Python
-├── database/               Esquema SQL de PostgreSQL
-│   └── kullkidb_postgres.sql  Esquema + datos iniciales (se ejecuta automáticamente)
+├── database/                Esquema SQL de PostgreSQL
+│   └── kullkidb_postgres.sql  Esquema + datos iniciales, contraseñas ya hasheadas con bcrypt
 ├── docker-compose.yml      Orquestación de los 3 servicios (frontend, backend, db)
 └── README.md
 ```
@@ -47,6 +46,8 @@ Antes de comenzar, asegúrate de tener instalado:
 
 ## Instalación y Ejecución con Docker (Recomendado)
 
+El proyecto está preparado para levantarse con **un solo comando**. No se necesita ningún paso manual de configuración de base de datos: las 6 agencias, los 13 usuarios, las áreas críticas y los lectores QR se cargan automáticamente la primera vez que arranca el contenedor de PostgreSQL.
+
 ### Paso 1 — Clonar el repositorio
 
 ```bash
@@ -58,42 +59,22 @@ cd "Kullki wasi"
 ### Paso 2 — Levantar todos los servicios
 
 ```bash
-docker compose up --build
+docker compose up
 ```
 
-> **Primera ejecución:** Docker descargará las imágenes base (Node.js, Python, PostgreSQL) y compilará los contenedores. Tiempo estimado: **5-10 minutos** según la velocidad de internet.
+> **Primera ejecución:** Docker descargará las imágenes base (Node.js, Python, PostgreSQL), compilará los contenedores y cargará automáticamente el esquema con todos los datos iniciales. Tiempo estimado: **5-10 minutos** según la velocidad de internet.
 
-Espera hasta ver en la terminal mensajes similares a:
-
-```
-kullki-wasi-db   | database system is ready to accept connections
-backend-1        | Tablas de Base de Datos inicializadas.
-backend-1        | Uvicorn running on http://0.0.0.0:3001
-frontend-1       | VITE v5.x.x ready in xxx ms
-frontend-1       | ➜ Local:   http://localhost:5173/
-```
-
-### Paso 3 — Poblar la base de datos con usuarios de prueba
-
-En una **nueva terminal** (sin cerrar la anterior), ejecuta:
-
-```bash
-docker compose exec backend python seed_db.py
-```
-
-Deberías ver la salida:
+Docker Compose espera automáticamente a que PostgreSQL esté **completamente listo** (healthcheck) antes de arrancar el backend, así que no hay condiciones de carrera ni pasos manuales adicionales. Espera hasta ver en la terminal mensajes similares a:
 
 ```
-Base de datos poblada con exito.
---- Credenciales de Prueba ---
-Administrador    -> Cedula: 0987654321   | Pass: admin123
-Empleado         -> Cedula: 1712345678   | Pass: empleado123
-...
+kullki-wasi-db     | database system is ready to accept connections
+kullkiwasi-backend-1  | Tablas de Base de Datos inicializadas.
+kullkiwasi-backend-1  | Uvicorn running on http://0.0.0.0:3001
+kullkiwasi-frontend-1 | VITE v5.x.x ready in xxx ms
+kullkiwasi-frontend-1 | ➜ Local:   http://localhost:5173/
 ```
 
-> **¿Por qué es necesario este paso?** El archivo SQL (`kullkidb_postgres.sql`) crea las tablas y datos iniciales, pero las contraseñas quedan en texto plano. El script `seed_db.py` genera los hashes bcrypt que el sistema necesita para autenticar correctamente. **Sin este paso, no podrás iniciar sesión.**
-
-### Paso 4 — Acceder al sistema
+### Paso 3 — Acceder al sistema
 
 Abre tu navegador y visita:
 
@@ -105,9 +86,9 @@ Abre tu navegador y visita:
 
 > **NOTA:** NO uses `http://localhost:3000`. El frontend funcional es el que se sirve en el puerto **5173** (servidor de desarrollo Vite). El puerto 3000 ya no se utiliza.
 
-### Paso 5 — Iniciar sesión
+### Paso 4 — Iniciar sesión
 
-Usa las siguientes credenciales de administrador para la primera prueba:
+Usa las siguientes credenciales de administrador global para la primera prueba (ver la tabla completa de usuarios más abajo):
 
 - **Cédula:** `0987654321`
 - **Contraseña:** `admin123`
@@ -123,14 +104,17 @@ docker compose down
 # Volver a iniciar (sin reconstruir)
 docker compose up
 
-# Reconstruir e iniciar (necesario si cambiaste dependencias o Dockerfiles)
+# Reconstruir e iniciar (necesario si cambiaste código del backend o dependencias)
 docker compose up --build
 
 # Eliminar TODO (incluidos datos de la BD) y reconstruir desde cero
 docker compose down -v
 docker compose up --build
-# IMPORTANTE: tras "down -v" debes ejecutar seed_db.py de nuevo (Paso 3)
+# Al arrancar de nuevo, la base de datos se vuelve a poblar automáticamente
+# con las 6 agencias, los 13 usuarios y todos los datos iniciales.
 ```
+
+> **Importante sobre el backend:** el Dockerfile del backend copia el código dentro de la imagen (`COPY . .`), no usa volumen montado. Si modificas archivos en `backend/` (por ejemplo `main.py`), los cambios **no se reflejarán** en el contenedor con un simple `docker compose restart backend` — necesitas reconstruir la imagen con `docker compose up --build backend`. El frontend sí tiene hot-reload automático porque usa volúmenes montados.
 
 ---
 
@@ -154,18 +138,17 @@ Si prefieres ejecutar los servicios directamente en tu máquina:
 psql -U postgres -c "CREATE USER kullki_user WITH PASSWORD 'kullki_pass';"
 psql -U postgres -c "CREATE DATABASE kullki_wasi_db OWNER kullki_user;"
 
-# Cargar el esquema y datos iniciales
+# Cargar el esquema y datos iniciales (contraseñas ya vienen hasheadas con bcrypt)
 psql -U kullki_user -d kullki_wasi_db -f database/kullkidb_postgres.sql
 ```
 
-> **Nota:** Si PostgreSQL usa un puerto diferente al 5432, ajusta la variable `DATABASE_URL` en `backend/database.py`.
+> **Nota:** Si PostgreSQL usa un puerto diferente al 5432, ajusta la variable `DATABASE_URL` en `backend/database.py`. No es necesario ejecutar ningún script de seed adicional: las contraseñas del archivo SQL ya están hasheadas y listas para autenticar.
 
 ### 2. Iniciar el backend
 
 ```bash
 cd backend
 pip install -r requirements.txt
-python seed_db.py
 uvicorn main:app --host 0.0.0.0 --port 3001
 ```
 
@@ -188,7 +171,7 @@ El frontend estará disponible en **http://localhost:5173**.
 ## Puertos del Sistema
 
 | Servicio    | Puerto (Docker) | Puerto (Local)  | Descripción                        |
-|-------------|-----------------|------------------|------------------------------------|
+|-------------|-----------------|------------------|-------------------------------------|
 | Frontend    | 5173            | 5173             | Servidor de desarrollo Vite        |
 | Backend     | 3001            | 3001             | API REST FastAPI (uvicorn)         |
 | PostgreSQL  | 5433            | 5432             | Base de datos PostgreSQL           |
@@ -197,48 +180,64 @@ El frontend estará disponible en **http://localhost:5173**.
 
 ---
 
-## Credenciales de Prueba
+## Credenciales de Usuarios del Sistema
 
-### Administrador General (Matriz Ambato)
+Al arrancar el proyecto por primera vez se cargan **6 agencias** y **13 usuarios** con roles y contraseñas ya definidos. No hace falta crear nada manualmente para empezar a probar el sistema.
 
-| Rol           | Cédula       | Contraseña | Agencia       |
-|---------------|-------------|------------|---------------|
-| Administrador | 0987654321  | admin123   | Matriz Ambato |
-
-### Usuarios por Rol
+### Agencia Matriz Ambato (MAT) — 8 roles completos
 
 | Rol               | Cédula       | Contraseña    | Módulos accesibles                                    |
-|-------------------|-------------|---------------|-------------------------------------------------------|
-| Empleado          | 1712345678  | empleado123   | Dashboard personal y perfil                           |
-| Talento Humano    | 1234567890  | talento123    | Gestión de empleados y credenciales QR                |
-| Oficial Riesgos   | 2345678901  | riesgos123    | Consola de alertas e incidentes de seguridad          |
-| Seguridad Física  | 3456789012  | seguridad123  | Alertas, control QR y áreas críticas                  |
-| Auditor Interno   | 4567890123  | auditor123    | Módulo de auditoría y bitácora de accesos             |
-| Jefe de Agencia   | 5678901234  | jefe123       | Dashboard, agencias y empleados de su agencia         |
-| Técnico TI        | 6789012345  | tecnico123    | Dispositivos de escaneo y configuración del sistema   |
+|-------------------|-------------|---------------|---------------------------------------------------------|
+| Administrador     | 0987654321  | admin123      | Acceso irrestricto a todo el sistema y todas las agencias |
+| Empleado          | 1712345678  | empleado123   | Dashboard personal y perfil                              |
+| Talento Humano    | 1234567890  | talento123    | Gestión de colaboradores y credenciales QR               |
+| Oficial Riesgos   | 2345678901  | riesgos123    | Consola de alertas e incidentes de seguridad             |
+| Seguridad Física  | 3456789012  | seguridad123  | Alertas, Control QR y Áreas Críticas                     |
+| Auditor Interno   | 4567890123  | auditor123    | Módulo de auditoría y bitácora de accesos                |
+| Jefe de Agencia   | 5678901234  | jefe123       | Colaboradores, dashboard y agencia (solo MAT)            |
+| Técnico TI        | 6789012345  | tecnico123    | Dispositivos de escaneo y configuración del sistema      |
 
-### Administradores por Agencia
+### Jefes de Agencia por Sucursal
 
-Cada agencia tiene su propio administrador. Contraseña uniforme: `Admin2024.`
+Cada sucursal tiene un único responsable con rol **Jefe de Agencia**, que solo puede gestionar colaboradores dentro de su propia agencia (no puede crear otras agencias ni asignar el rol Administrador).
 
-| Agencia             | Código | Cédula       | Email                               |
-|---------------------|--------|-------------|-------------------------------------|
-| Agencia Pelileo     | PEL    | 1800000001  | admin.pelileo@kullkiwasi.fin.ec     |
-| Agencia Píllaro     | PIL    | 1800000002  | admin.pillaro@kullkiwasi.fin.ec     |
-| Agencia Baños       | BAN    | 1800000003  | admin.banos@kullkiwasi.fin.ec       |
-| Agencia Salcedo     | SAL    | 1800000004  | admin.salcedo@kullkiwasi.fin.ec     |
-| Agencia Quisapincha | QUI    | 1800000005  | admin.quisapincha@kullkiwasi.fin.ec |
+| Agencia             | Código | Cédula      | Contraseña      | Correo                             |
+|---------------------|--------|-------------|-----------------|-------------------------------------|
+| Agencia Pelileo     | PEL    | 1800000001  | jefe.pel2026    | marco.cepeda@kullkiwasi.fin.ec      |
+| Agencia Píllaro     | PIL    | 1800000002  | jefe.pil2026    | diana.flores@kullkiwasi.fin.ec      |
+| Agencia Baños       | BAN    | 1800000003  | jefe.ban2026    | rodrigo.mora@kullkiwasi.fin.ec      |
+| Agencia Salcedo     | SAL    | 1800000004  | jefe.sal2026    | elena.chavez@kullkiwasi.fin.ec      |
+| Agencia Quisapincha | QUI    | 1800000005  | jefe.qui2026    | fernando.tello@kullkiwasi.fin.ec    |
 
 ### Descripción de roles y permisos (RBAC)
 
-- **Administrador**: acceso irrestricto a todos los módulos, configuración global, gestión de usuarios y respaldo de datos.
+- **Administrador**: único rol con acceso irrestricto a todos los módulos, todas las agencias, configuración global, gestión de usuarios y respaldo de datos. Solo debe existir un administrador global en el sistema.
+- **Jefe de Agencia**: gestiona los colaboradores de **su propia agencia únicamente** (creación, edición, baja). No puede ver ni modificar empleados de otras agencias, no puede crear nuevas agencias y no puede asignar el rol de Administrador a nadie.
+- **Talento Humano**: crea, edita y desactiva cuentas de colaboradores; gestiona las credenciales QR institucionales (alcance global, agencia Matriz).
 - **Empleado**: visualiza únicamente las áreas críticas a las que tiene permiso según su rol institucional.
-- **Talento Humano**: crea, edita y desactiva cuentas de empleados; gestiona las credenciales QR institucionales.
 - **Oficial Riesgos**: revisa y actualiza el estado de las alertas de seguridad (Abierta, En Investigación, Resuelta).
 - **Seguridad Física**: opera el lector QR para validar accesos y gestiona alertas activas.
-- **Auditor Interno**: genera informes de auditoría, revisa la bitácora completa de accesos y exporta reportes PDF/Excel.
-- **Jefe de Agencia**: supervisa el dashboard de su agencia y el personal asignado a ella.
+- **Auditor Interno**: genera informes de auditoría, revisa la bitácora completa de accesos y exporta reportes.
 - **Técnico TI**: administra los dispositivos de escaneo QR registrados en el sistema.
+
+### Creación de nuevas agencias
+
+Solo el **Administrador global** puede crear una agencia nueva desde el módulo **Agencias**. Al hacerlo, el formulario exige designar de forma **obligatoria** al Jefe de esa agencia (nombres, apellidos, cédula y contraseña) en el mismo paso — no es posible crear una agencia sin asignarle un responsable. Esa persona quedará automáticamente con el rol Jefe de Agencia, limitado a gestionar únicamente el personal de su propia sucursal.
+
+---
+
+## Datos Precargados del Sistema
+
+Además de los usuarios, el arranque inicial incluye:
+
+| Recurso                | Cantidad | Detalle                                                        |
+|-------------------------|----------|-----------------------------------------------------------------|
+| Agencias                | 6        | Matriz Ambato + 5 sucursales (Pelileo, Píllaro, Baños, Salcedo, Quisapincha) |
+| Colaboradores            | 13       | 8 en Matriz Ambato + 1 jefe por cada sucursal                  |
+| Áreas Críticas           | 12       | 7 en Matriz Ambato (Bóveda, Servidores, Cajas, etc.) + 1 acceso principal por sucursal |
+| Dispositivos / Lectores QR | 12    | Un lector asignado a cada área crítica                          |
+| Departamentos            | 9        | Se crean automáticamente al iniciar el backend                 |
+| Roles                    | 8        | admin, empleado, talento_humano, riesgos, seguridad_fisica, auditor, jefe_agencia, tecnico_ti |
 
 ---
 
@@ -256,11 +255,11 @@ docker compose logs -f backend
 docker compose logs -f frontend
 docker compose logs -f db
 
-# Reiniciar un servicio individual
-docker compose restart backend
+# Reiniciar un servicio individual (solo refleja cambios en frontend, no en backend)
+docker compose restart frontend
 
-# Ejecutar un comando dentro del contenedor backend
-docker compose exec backend python seed_db.py
+# Reconstruir e iniciar el backend tras modificar su código
+docker compose up --build backend
 
 # Acceder a la consola de PostgreSQL
 docker compose exec db psql -U kullki_user -d kullki_wasi_db
@@ -285,20 +284,18 @@ taskkill /PID <PID> /F
 
 ### No puedo iniciar sesión (credenciales incorrectas)
 
-Ejecuta el script de seed para generar las contraseñas hasheadas con bcrypt:
+Las contraseñas ya vienen hasheadas con bcrypt dentro de `database/kullkidb_postgres.sql`, así que un `docker compose up` normal debería dejar todos los logins funcionando de inmediato. Si aun así falla:
 
 ```bash
-docker compose exec backend python seed_db.py
-```
+# Verificar que la base de datos realmente cargó los datos iniciales
+docker compose exec db psql -U kullki_user -d kullki_wasi_db -c "SELECT identificacion, nombres FROM empleados;"
 
-Si la base de datos ya tenía datos previos y da error de duplicados, reconstruye desde cero:
-
-```bash
+# Si la tabla está vacía o incompleta, reconstruir desde cero
 docker compose down -v
 docker compose up --build
-# Esperar a que los 3 servicios estén listos, luego:
-docker compose exec backend python seed_db.py
 ```
+
+> `docker compose down -v` borra el volumen de PostgreSQL, así que el archivo `kullkidb_postgres.sql` se vuelve a ejecutar automáticamente en el siguiente `up` (solo se ejecuta en un volumen vacío).
 
 ### "failed to solve: npm run build" o error de build del frontend
 
@@ -321,9 +318,19 @@ docker compose logs db
 2. Revisa la consola del navegador (F12 → Console) para ver errores de red.
 3. Verifica que el backend esté corriendo: abre http://localhost:3001/docs.
 
-### Los cambios en el código no se reflejan
+### Modifiqué `backend/main.py` y no veo los cambios
 
-El servidor de desarrollo Vite tiene **hot-reload automático**. Si los cambios no aparecen:
+El backend **no** tiene hot-reload ni volumen montado — el código se copia dentro de la imagen al momento del build. Después de cualquier cambio en `backend/`, reconstruye la imagen:
+
+```bash
+docker compose up --build backend
+```
+
+Un simple `docker compose restart backend` **no** es suficiente, porque reinicia el mismo contenedor con el código antiguo ya copiado.
+
+### Los cambios en el frontend no se reflejan
+
+El servidor de desarrollo Vite tiene **hot-reload automático** gracias a los volúmenes montados. Si aun así no aparecen:
 
 ```bash
 # Reiniciar el frontend
@@ -341,14 +348,12 @@ Abre Docker Desktop desde el menú inicio y espera a que se inicialice completam
 
 ## Resumen Rápido (Copiar y Pegar)
 
-Para levantar el proyecto completo desde cero en **4 comandos**:
+Para levantar el proyecto completo desde cero en **3 comandos**:
 
 ```bash
 git clone https://github.com/Esteban1142025/QRKullki.git
 cd QRKullki/"Kullki wasi"
-docker compose up --build
-# (En otra terminal, cuando los servicios estén listos:)
-docker compose exec backend python seed_db.py
+docker compose up
 ```
 
 Luego abre **http://localhost:5173** e inicia sesión con cédula `0987654321` y contraseña `admin123`.
