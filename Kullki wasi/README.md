@@ -120,7 +120,9 @@ docker compose up --build
 
 ## Ejecución en Desarrollo Local (sin Docker)
 
-Si prefieres ejecutar los servicios directamente en tu máquina:
+> **Esta sección es completamente opcional e independiente de Docker.** Si ya usaste `docker compose up` en la sección anterior, **no necesitas hacer nada de lo que sigue** — el sistema ya está funcionando. Esta ruta alternativa es solo para quienes prefieran instalar Node.js, Python y PostgreSQL directamente en su máquina en lugar de usar contenedores (por ejemplo, para depurar con mayor control o por preferencia personal).
+
+Si prefieres ejecutar los servicios directamente en tu máquina, sin Docker:
 
 ### Requisitos adicionales
 
