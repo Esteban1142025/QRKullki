@@ -287,6 +287,8 @@ class AgenciaCreate(BaseModel):
     @field_validator('tipo')
     @classmethod
     def validate_tipo(cls, v):
+        if v == 'Extension':
+            v = 'Extensión'
         if v not in ('Principal', 'Sucursal', 'Extensión'):
             raise ValueError('Tipo de agencia inválido')
         return v

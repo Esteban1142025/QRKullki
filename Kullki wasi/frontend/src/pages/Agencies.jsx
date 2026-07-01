@@ -3,6 +3,15 @@ import apiClient from '../services/api/apiClient';
 import Swal from 'sweetalert2';
 import { MdStore, MdLocationOn, MdPhone, MdAdd, MdEdit, MdDelete, MdClose, MdSave, MdRefresh, MdPerson } from 'react-icons/md';
 
+// Convierte el detalle de error de FastAPI (string o array de objetos) a texto legible
+const parseApiError = (err) => {
+  const detail = err?.response?.data?.detail;
+  if (!detail) return null;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) return detail.map(d => d.msg || JSON.stringify(d)).join(' | ');
+  return JSON.stringify(detail);
+};
+
 // Cuenta alertas abiertas por código de agencia y devuelve el nivel operativo
 const getAlertLevel = (agencyCode, alertCounts) => {
   const count = alertCounts[agencyCode] ?? 0;
@@ -80,7 +89,7 @@ const Agencies = () => {
           await fetchAgencies();
           Swal.fire({ icon: 'success', title: 'Agencia Eliminada', timer: 1500, showConfirmButton: false });
         } catch (err) {
-          Swal.fire({ icon: 'error', title: 'Error', text: err.response?.data?.detail || 'No se pudo eliminar la agencia.' });
+          Swal.fire({ icon: 'error', title: 'Error', text: parseApiError(err) || 'No se pudo eliminar la agencia.' });
         }
       }
     });
@@ -148,7 +157,7 @@ const Agencies = () => {
       setShowForm(false);
       Swal.fire({ icon: 'success', title: editing ? 'Agencia Actualizada' : 'Agencia Creada', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err.response?.data?.detail || 'Error al guardar la agencia.' });
+      Swal.fire({ icon: 'error', title: 'Error', text: parseApiError(err) || 'Error al guardar la agencia.' });
     }
   };
 

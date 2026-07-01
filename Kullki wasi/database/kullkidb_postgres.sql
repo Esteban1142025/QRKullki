@@ -144,7 +144,7 @@ INSERT INTO agencias (nombre, codigo, direccion, tipo, estado) VALUES
   ('Agencia Pillaro',     'PIL', 'Bolivar y Padre Chacon, Pillaro',           'Sucursal',  true),
   ('Agencia Banos',       'BAN', 'Ambato y Rocafuerte, Banos de Agua Santa',  'Sucursal',  true),
   ('Agencia Salcedo',     'SAL', 'Sucre y 24 de Mayo, Salcedo',               'Sucursal',  true),
-  ('Agencia Quisapincha', 'QUI', 'Parroquia Quisapincha, Ambato',             'Extension', true);
+  ('Agencia Quisapincha', 'QUI', 'Parroquia Quisapincha, Ambato',             'Extensión', true);
 
 -- Insertar Permisos
 INSERT INTO permisos (codigo_permiso, descripcion) VALUES 
